@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<title>scan to text</title>
+
+<!-- ========================================
+     PDF.js
+     Нужен для открытия PDF и отрисовки страниц
+======================================== -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module"></script>
+
+<!-- ========================================
+     Tesseract.js
+     Нужен для OCR: картинка / скан -> текст
+======================================== -->
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+<style>
+/* ========================================
+   БАЗА
+======================================== */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 24px;
+  font-family: Arial, sans-serif;
+  background: #f4f6f8;
+  color: #1e293b;
+}
+
+.container {
+  max-width: 1380px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+}
+
+h1, h2, h3 {
+  margin-top: 0;
+}
+
+/* ========================================
+   ВЕРХНЯЯ ПАНЕЛЬ
+======================================== */
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 18px;
+  align-items: end;
+  margin-bottom: 18px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 14px;
+  color: #334155;
+}
+
+.field input,
+.field select {
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  min-width: 180px;
+  background: #fff;
+}
+
+button {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  background: #2563eb;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+button:hover {
+  background: #1d4ed8;
+}
+
+button:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+}
+
+button.secondary {
+  background: #475569;
+}
+
+button.secondary:hover {
+  background: #334155;
+}
+
+/* ========================================
+   СТАТУС
+======================================== */
+
+.status {
+  min-height: 22px;
+  margin-bottom: 18px;
+  font-size: 14px;
+  white-space: pre-line;
+}
+
+.status-ok {
+  color: #15803d;
+}
+
+.status-error {
+  color: #b91c1c;
+}
+
+.status-warn {
+  color: #ca8a04;
+}
+
+/* ========================================
+   ОСНОВНАЯ СЕТКА
+======================================== */
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.panel {
+  flex: 1 1 560px;
+  background: #fafafa;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.preview-box {
+  min-height: 420px;
+  background: #e5e7eb;
+  border-radius: 10px;
+  overflow: auto;
+  padding: 12px;
+}
+
+.preview-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.page-block {
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.page-title {
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: #334155;
+}
+
+.page-canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid #dbeafe;
+  background: white;
+}
+
+textarea {
+  width: 100%;
+  min-height: 520px;
+  resize: vertical;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 12px;
+  font-family: Consolas, monospace;
+  font-size: 14px;
+  line-height: 1.45;
+  background: white;
+  color: #0f172a;
+}
+
+.info {
+  margin-top: 12px;
+  font-size: 14px;
+  color: #475569;
+  white-space: pre-line;
+}
+
+.note {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #64748b;
+  white-space: pre-line;
+}
+
+.progress {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #0f172a;
+  white-space: pre-line;
+}
+
+@media (max-width: 900px) {
+  body {
+    padding: 14px;
+  }
+
+  .container {
+    padding: 16px;
+  }
+
+  .controls {
+    align-items: stretch;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <h1>Scan to text</h1>
+
+  <div class="controls">
+
+    <!-- ========================================
+         ФАЙЛ
+    ======================================== -->
+    <div class="field">
+      <label for="fileInput">Файл</label>
+      <input id="fileInput" type="file" accept="image/*,.pdf" />
+    </div>
+
+    <!-- ========================================
+         ЯЗЫК OCR
+    ======================================== -->
+    <div class="field">
+      <label for="langSelect">Язык OCR</label>
+      <select id="langSelect">
+        <option value="eng">English</option>
+        <option value="rus">Russian</option>
+        <option value="heb">Hebrew</option>
+        <option value="eng+rus">English + Russian</option>
+        <option value="eng+heb">English + Hebrew</option>
+        <option value="rus+heb">Russian + Hebrew</option>
+        <option value="eng+rus+heb">English + Russian + Hebrew</option>
+      </select>
+    </div>
+
+    <!-- ========================================
+         МАСШТАБ РЕНДЕРА PDF
+         Чем больше — тем лучше OCR, но медленнее
+    ======================================== -->
+    <div class="field">
+      <label for="pdfScale">PDF scale</label>
+      <select id="pdfScale">
+        <option value="1.5">1.5</option>
+        <option value="2" selected>2.0</option>
+        <option value="2.5">2.5</option>
+        <option value="3">3.0</option>
+      </select>
+    </div>
+
+    <!-- ========================================
+         КНОПКИ
+    ======================================== -->
+    <div class="field">
+      <label>&nbsp;</label>
+      <button id="runBtn" type="button">Распознать</button>
+    </div>
+
+    <div class="field">
+      <label>&nbsp;</label>
+      <button id="downloadTxtBtn" type="button" class="secondary" disabled>
+        Скачать TXT
+      </button>
+    </div>
+
+    <div class="field">
+      <label>&nbsp;</label>
+      <button id="clearBtn" type="button" class="secondary">
+        Очистить
+      </button>
+    </div>
+
+  </div>
+
+  <div id="status" class="status"></div>
+
+  <div class="row">
+
+    <!-- ========================================
+         ПРЕДПРОСМОТР
+    ======================================== -->
+    <div class="panel">
+      <h3>Preview</h3>
+
+      <div class="preview-box">
+        <div id="previewStack" class="preview-stack"></div>
+      </div>
+
+      <div id="fileInfo" class="info"></div>
+
+      <div class="note">
+Поддержка:
+- image -> OCR
+- PDF-скан -> каждая страница рендерится и распознаётся отдельно
+
+Если PDF уже текстовый, этот HTML всё равно работает через OCR, то есть медленнее, но одинаково для сканов.
+      </div>
+    </div>
+
+    <!-- ========================================
+         ТЕКСТ
+    ======================================== -->
+    <div class="panel">
+      <h3>Text</h3>
+
+      <textarea id="textOutput" placeholder="Здесь появится распознанный текст"></textarea>
+
+      <div id="progressBox" class="progress"></div>
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+/*
+================================
+IMPORT PDF.js
+================================
+*/
+import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs";
+
+/*
+  Указываем worker для PDF.js
+*/
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
+
+/*
+================================
+DOM
+================================
+*/
+const fileInput = document.getElementById("fileInput");
+const langSelect = document.getElementById("langSelect");
+const pdfScale = document.getElementById("pdfScale");
+
+const runBtn = document.getElementById("runBtn");
+const downloadTxtBtn = document.getElementById("downloadTxtBtn");
+const clearBtn = document.getElementById("clearBtn");
+
+const statusBox = document.getElementById("status");
+const previewStack = document.getElementById("previewStack");
+const fileInfo = document.getElementById("fileInfo");
+const textOutput = document.getElementById("textOutput");
+const progressBox = document.getElementById("progressBox");
+
+/*
+================================
+СОСТОЯНИЕ
+================================
+*/
+let currentFile = null;
+let currentPreviewUrls = [];
+
+/*
+================================
+СЛУЖЕБНЫЕ ФУНКЦИИ
+================================
+*/
+
+function setStatus(text) {
+  statusBox.textContent = text;
+
+  statusBox.classList.remove(
+    "status-ok",
+    "status-error",
+    "status-warn"
+  );
+
+  const upper = String(text || "").toUpperCase();
+
+  if (upper.includes("OK")) {
+    statusBox.classList.add("status-ok");
+    return;
+  }
+
+  if (upper.includes("ERROR")) {
+    statusBox.classList.add("status-error");
+    return;
+  }
+
+  statusBox.classList.add("status-warn");
+}
+
+function clearStatus() {
+  statusBox.textContent = "";
+  statusBox.classList.remove(
+    "status-ok",
+    "status-error",
+    "status-warn"
+  );
+}
+
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / 1024 / 1024).toFixed(2) + " MB";
+}
+
+function clearPreview() {
+  currentPreviewUrls.forEach(url => URL.revokeObjectURL(url));
+  currentPreviewUrls = [];
+  previewStack.innerHTML = "";
+}
+
+function clearAll() {
+  currentFile = null;
+  fileInput.value = "";
+  textOutput.value = "";
+  fileInfo.textContent = "";
+  progressBox.textContent = "";
+  downloadTxtBtn.disabled = true;
+  clearPreview();
+  clearStatus();
+}
+
+function fileToArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("file read error"));
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+function fileToDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("file read error"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function canvasToBlob(canvas, type = "image/png", quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("cannot create Blob"));
+        return;
+      }
+      resolve(blob);
+    }, type, quality);
+  });
+}
+
+function addCanvasToPreview(canvas, title) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "page-block";
+
+  const titleBox = document.createElement("div");
+  titleBox.className = "page-title";
+  titleBox.textContent = title;
+
+  canvas.className = "page-canvas";
+
+  wrapper.appendChild(titleBox);
+  wrapper.appendChild(canvas);
+  previewStack.appendChild(wrapper);
+}
+
+function addImageToPreview(src, title) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "page-block";
+
+  const titleBox = document.createElement("div");
+  titleBox.className = "page-title";
+  titleBox.textContent = title;
+
+  const img = document.createElement("img");
+  img.src = src;
+  img.className = "page-canvas";
+  img.alt = title;
+
+  wrapper.appendChild(titleBox);
+  wrapper.appendChild(img);
+  previewStack.appendChild(wrapper);
+}
+
+function downloadTextAsTxt(text, fileName = "scan-result.txt") {
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/*
+================================
+OCR ДЛЯ ОДНОЙ КАРТИНКИ / CANVAS
+================================
+*/
+async function recognizeWithTesseract(imageSource, pageLabel) {
+  const lang = langSelect.value;
+
+  const result = await Tesseract.recognize(
+    imageSource,
+    lang,
+    {
+      logger: (message) => {
+        /*
+          Показываем прогресс OCR
+        */
+        if (message.status) {
+          const percent = message.progress != null
+            ? " | " + Math.round(message.progress * 100) + "%"
+            : "";
+
+          progressBox.textContent =
+            "OCR: " + pageLabel + "\n" +
+            message.status + percent;
+        }
+      }
+    }
+  );
+
+  return result.data.text || "";
+}
+
+/*
+================================
+PDF -> СПИСОК CANVAS СТРАНИЦ
+================================
+*/
+async function renderPdfToCanvases(file) {
+  const buffer = await fileToArrayBuffer(file);
+
+  /*
+    Важно:
+    передаём Uint8Array для PDF.js
+  */
+  const pdf = await pdfjsLib.getDocument({
+    data: new Uint8Array(buffer)
+  }).promise;
+
+  const scale = Number(pdfScale.value) || 2;
+
+  const pages = [];
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    progressBox.textContent =
+      "PDF render: page " + pageNum + " / " + pdf.numPages;
+
+    const page = await pdf.getPage(pageNum);
+    const viewport = page.getViewport({ scale });
+
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+
+    await page.render({
+      canvasContext: ctx,
+      viewport
+    }).promise;
+
+    pages.push({
+      pageNum,
+      canvas
+    });
+  }
+
+  return {
+    pageCount: pdf.numPages,
+    pages
+  };
+}
+
+/*
+================================
+ОБРАБОТКА IMAGE
+================================
+*/
+async function processImageFile(file) {
+  clearPreview();
+  textOutput.value = "";
+  progressBox.textContent = "";
+
+  const dataUrl = await fileToDataURL(file);
+
+  /*
+    Показываем исходную картинку
+  */
+  addImageToPreview(dataUrl, "Image preview");
+
+  progressBox.textContent = "OCR: image";
+  const text = await recognizeWithTesseract(dataUrl, "image");
+
+  textOutput.value = text.trim();
+  downloadTxtBtn.disabled = !textOutput.value.trim();
+
+  fileInfo.textContent =
+    "Name: " + file.name + "\n" +
+    "Type: " + file.type + "\n" +
+    "Size: " + formatSize(file.size);
+
+  setStatus("OCR OK");
+  progressBox.textContent = "Done";
+}
+
+/*
+================================
+ОБРАБОТКА PDF
+================================
+*/
+async function processPdfFile(file) {
+  clearPreview();
+  textOutput.value = "";
+  progressBox.textContent = "";
+
+  const rendered = await renderPdfToCanvases(file);
+
+  /*
+    Показываем все страницы PDF
+  */
+  rendered.pages.forEach((item) => {
+    addCanvasToPreview(item.canvas, "PDF page " + item.pageNum);
+  });
+
+  const parts = [];
+
+  for (const item of rendered.pages) {
+    progressBox.textContent =
+      "OCR page " + item.pageNum + " / " + rendered.pageCount;
+
+    const text = await recognizeWithTesseract(
+      item.canvas,
+      "page " + item.pageNum
+    );
+
+    parts.push(
+      "===== PAGE " + item.pageNum + " =====\n" +
+      text.trim()
+    );
+  }
+
+  textOutput.value = parts.join("\n\n");
+  downloadTxtBtn.disabled = !textOutput.value.trim();
+
+  fileInfo.textContent =
+    "Name: " + file.name + "\n" +
+    "Type: " + file.type + "\n" +
+    "Size: " + formatSize(file.size) + "\n" +
+    "Pages: " + rendered.pageCount;
+
+  setStatus("OCR OK");
+  progressBox.textContent = "Done";
+}
+
+/*
+================================
+ОСНОВНОЙ ЗАПУСК
+================================
+*/
+runBtn.addEventListener("click", async () => {
+  clearStatus();
+  progressBox.textContent = "";
+  textOutput.value = "";
+  downloadTxtBtn.disabled = true;
+
+  const file = fileInput.files[0] || null;
+  currentFile = file;
+
+  if (!file) {
+    setStatus("ERROR: выбери файл");
+    return;
+  }
+
+  try {
+    runBtn.disabled = true;
+
+    /*
+      Проверяем тип:
+      - PDF
+      - image/*
+    */
+    if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
+      await processPdfFile(file);
+      return;
+    }
+
+    if (file.type.startsWith("image/")) {
+      await processImageFile(file);
+      return;
+    }
+
+    setStatus("ERROR: поддерживаются только image и pdf");
+  } catch (error) {
+    setStatus("ERROR: " + (error.message || error));
+    progressBox.textContent = "";
+  } finally {
+    runBtn.disabled = false;
+  }
+});
+
+/*
+================================
+СКАЧАТЬ TXT
+================================
+*/
+downloadTxtBtn.addEventListener("click", () => {
+  const text = textOutput.value.trim();
+
+  if (!text) {
+    setStatus("ERROR: нечего скачивать");
+    return;
+  }
+
+  const baseName = currentFile
+    ? currentFile.name.replace(/\.[^/.]+$/, "")
+    : "scan-result";
+
+  downloadTextAsTxt(text, baseName + ".txt");
+  setStatus("save TXT OK");
+});
+
+/*
+================================
+ОЧИСТИТЬ
+================================
+*/
+clearBtn.addEventListener("click", () => {
+  clearAll();
+});
+
+/*
+================================
+ПОКАЗ ИНФО ПОСЛЕ ВЫБОРА ФАЙЛА
+================================
+*/
+fileInput.addEventListener("change", () => {
+  clearStatus();
+  textOutput.value = "";
+  progressBox.textContent = "";
+  downloadTxtBtn.disabled = true;
+  clearPreview();
+
+  const file = fileInput.files[0] || null;
+  currentFile = file;
+
+  if (!file) {
+    fileInfo.textContent = "";
+    return;
+  }
+
+  fileInfo.textContent =
+    "Name: " + file.name + "\n" +
+    "Type: " + (file.type || "unknown") + "\n" +
+    "Size: " + formatSize(file.size);
+
+  setStatus("Файл выбран");
+});
+</script>
+
+</body>
+</html>
