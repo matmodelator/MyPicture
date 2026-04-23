@@ -1,0 +1,832 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<title>translate txt</title>
+
+<style>
+/* ========================================
+   СТИЛЬ КОНСОЛИ
+======================================== */
+
+#service-console {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  padding: 6px 10px;
+  background: #111;
+  color: #8cff8c;
+  font-family: monospace;
+  font-size: 12px;
+  border-top: 1px solid #333;
+  z-index: 9999;
+  opacity: 0.9;
+}
+
+#service-console .row {
+  display: block;
+}
+
+  
+/* ========================================
+   БАЗА
+======================================== */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 24px;
+  font-family: Arial, sans-serif;
+  background: #f4f6f8;
+  color: #1e293b;
+}
+
+.container {
+  max-width: 1320px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+}
+
+h1, h2, h3 {
+  margin-top: 0;
+}
+
+/* ========================================
+   ВЕРХНЯЯ ПАНЕЛЬ
+======================================== */
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 18px;
+  align-items: end;
+  margin-bottom: 18px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 14px;
+  color: #334155;
+}
+
+.field input,
+.field select {
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  min-width: 180px;
+  background: #fff;
+}
+
+.field.wide {
+  min-width: 320px;
+  flex: 1 1 320px;
+}
+
+button {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  background: #2563eb;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+button:hover {
+  background: #1d4ed8;
+}
+
+button:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+}
+
+button.secondary {
+  background: #475569;
+}
+
+button.secondary:hover {
+  background: #334155;
+}
+
+/* ========================================
+   СТАТУС
+======================================== */
+
+.status {
+  min-height: 22px;
+  margin-bottom: 18px;
+  font-size: 14px;
+  white-space: pre-line;
+}
+
+.status-ok {
+  color: #15803d;
+}
+
+.status-error {
+  color: #b91c1c;
+}
+
+.status-warn {
+  color: #ca8a04;
+}
+
+/* ========================================
+   ДВЕ ПАНЕЛИ
+======================================== */
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.panel {
+  flex: 1 1 560px;
+  background: #fafafa;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+textarea {
+  width: 100%;
+  min-height: 460px;
+  resize: vertical;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 12px;
+  font-family: Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  background: white;
+  color: #0f172a;
+}
+
+textarea[dir="rtl"] {
+  text-align: right;
+}
+
+.info {
+  margin-top: 12px;
+  font-size: 14px;
+  color: #475569;
+  white-space: pre-line;
+}
+
+.note {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #64748b;
+  white-space: pre-line;
+}
+
+.counter {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #475569;
+}
+
+@media (max-width: 900px) {
+  body {
+    padding: 14px;
+  }
+
+  .container {
+    padding: 16px;
+  }
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <h1>Translate TXT</h1>
+
+  <div class="controls">
+
+    <!-- ========================================
+         TXT ФАЙЛ
+======================================== -->
+    <div class="field">
+      <label for="txtFileInput">TXT file</label>
+      <input id="txtFileInput" type="file" accept=".txt,text/plain" />
+    </div>
+
+    <!-- ========================================
+         ENDPOINT API
+         Сюда можно поставить свой сервер перевода
+======================================== -->
+    <div class="field wide">
+      <label for="apiUrl">API URL</label>
+      <input
+        id="apiUrl"
+        type="text"
+        value="https://libretranslate.com/translate"
+        placeholder="https://your-server/translate"
+      />
+    </div>
+
+    <!-- ========================================
+         API KEY
+         Для некоторых hosted серверов обязателен
+======================================== -->
+    <div class="field">
+      <label for="apiKey">API key</label>
+      <input
+        id="apiKey"
+        type="text"
+        placeholder="optional"
+      />
+    </div>
+
+    <!-- ========================================
+         ЯЗЫК ИСТОЧНИКА
+======================================== -->
+    <div class="field">
+      <label for="sourceLang">Source</label>
+      <select id="sourceLang">
+        <option value="ru" selected>Russian</option>
+        <option value="he">Hebrew</option>
+        <option value="en">English</option>
+        <option value="auto">Auto</option>
+      </select>
+    </div>
+
+    <!-- ========================================
+         ЯЗЫК ПЕРЕВОДА
+======================================== -->
+    <div class="field">
+      <label for="targetLang">Target</label>
+      <select id="targetLang">
+        <option value="he" selected>Hebrew</option>
+        <option value="ru">Russian</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+
+    <!-- ========================================
+         КНОПКИ
+======================================== -->
+    <div class="field">
+      <label>&nbsp;</label>
+      <button id="translateBtn" type="button">Перевести</button>
+    </div>
+
+    <div class="field">
+      <label>&nbsp;</label>
+      <button id="swapBtn" type="button" class="secondary">Поменять</button>
+    </div>
+
+    <div class="field">
+      <label>&nbsp;</label>
+      <button id="downloadSourceBtn" type="button" class="secondary" disabled>
+        Скачать source TXT
+      </button>
+    </div>
+
+    <div class="field">
+      <label>&nbsp;</label>
+      <button id="downloadResultBtn" type="button" class="secondary" disabled>
+        Скачать result TXT
+      </button>
+    </div>
+
+    <div class="field">
+      <label>&nbsp;</label>
+      <button id="clearBtn" type="button" class="secondary">
+        Очистить
+      </button>
+    </div>
+
+  </div>
+
+  <div id="status" class="status"></div>
+
+  <div class="row">
+
+    <!-- ========================================
+         ИСХОДНЫЙ ТЕКСТ
+======================================== -->
+    <div class="panel">
+      <h3>Source text</h3>
+
+      <textarea
+        id="sourceText"
+        placeholder="Вставь сюда исходный текст или загрузи TXT"
+        dir="auto"
+      ></textarea>
+
+      <div id="sourceCounter" class="counter"></div>
+
+      <div id="sourceInfo" class="info"></div>
+
+      <div class="note">
+Поддерживается обычный TXT файл.
+Можно:
+- загрузить TXT
+- вручную вставить текст
+- перевести с русского на иврит
+- сохранить результат обратно в TXT
+      </div>
+    </div>
+
+    <!-- ========================================
+         ПЕРЕВОД
+======================================== -->
+    <div class="panel">
+      <h3>Translated text</h3>
+
+      <textarea
+        id="resultText"
+        placeholder="Здесь появится перевод"
+        dir="rtl"
+      ></textarea>
+
+      <div id="resultCounter" class="counter"></div>
+
+      <div id="resultInfo" class="info"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+/*
+================================
+DOM
+================================
+*/
+const txtFileInput = document.getElementById("txtFileInput");
+
+const apiUrl = document.getElementById("apiUrl");
+const apiKey = document.getElementById("apiKey");
+
+const sourceLang = document.getElementById("sourceLang");
+const targetLang = document.getElementById("targetLang");
+
+const translateBtn = document.getElementById("translateBtn");
+const swapBtn = document.getElementById("swapBtn");
+const downloadSourceBtn = document.getElementById("downloadSourceBtn");
+const downloadResultBtn = document.getElementById("downloadResultBtn");
+const clearBtn = document.getElementById("clearBtn");
+
+const statusBox = document.getElementById("status");
+
+const sourceText = document.getElementById("sourceText");
+const resultText = document.getElementById("resultText");
+
+const sourceCounter = document.getElementById("sourceCounter");
+const resultCounter = document.getElementById("resultCounter");
+
+const sourceInfo = document.getElementById("sourceInfo");
+const resultInfo = document.getElementById("resultInfo");
+
+/*
+================================
+СОСТОЯНИЕ
+================================
+*/
+let currentSourceFileName = "source.txt";
+
+/*
+================================
+СТАТУС
+================================
+*/
+function setStatus(text) {
+  statusBox.textContent = text;
+
+  statusBox.classList.remove(
+    "status-ok",
+    "status-error",
+    "status-warn"
+  );
+
+  if (typeof text !== "string") {
+    statusBox.classList.add("status-warn");
+    return;
+  }
+
+  const upper = text.toUpperCase();
+
+  if (upper.includes("OK")) {
+    statusBox.classList.add("status-ok");
+    return;
+  }
+
+  if (upper.includes("ERROR")) {
+    statusBox.classList.add("status-error");
+    return;
+  }
+
+  statusBox.classList.add("status-warn");
+}
+
+function clearStatus() {
+  statusBox.textContent = "";
+  statusBox.classList.remove(
+    "status-ok",
+    "status-error",
+    "status-warn"
+  );
+}
+
+/*
+================================
+ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ
+================================
+*/
+function formatSize(bytes) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / 1024 / 1024).toFixed(2) + " MB";
+}
+
+function getBaseName(fileName) {
+  return String(fileName || "file").replace(/\.[^/.]+$/, "");
+}
+
+function readTextFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("file read error"));
+
+    reader.readAsText(file, "UTF-8");
+  });
+}
+
+function downloadTextAsTxt(text, fileName) {
+  const blob = new Blob(
+    [text],
+    { type: "text/plain;charset=utf-8" }
+  );
+
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = fileName;
+  link.click();
+
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 1000);
+}
+
+function updateCounters() {
+  const sourceValue = sourceText.value || "";
+  const resultValue = resultText.value || "";
+
+  sourceCounter.textContent =
+    "Chars: " + sourceValue.length +
+    " | Lines: " + countLines(sourceValue);
+
+  resultCounter.textContent =
+    "Chars: " + resultValue.length +
+    " | Lines: " + countLines(resultValue);
+}
+
+function countLines(text) {
+  if (!text) return 0;
+  return text.split(/\r?\n/).length;
+}
+
+function updateDownloadButtons() {
+  downloadSourceBtn.disabled = !sourceText.value.trim();
+  downloadResultBtn.disabled = !resultText.value.trim();
+}
+
+function updateResultDirection() {
+  /*
+    Для иврита ставим RTL,
+    для русского и английского — LTR
+  */
+  if (targetLang.value === "he") {
+    resultText.dir = "rtl";
+  } else {
+    resultText.dir = "ltr";
+  }
+}
+
+function clearAll() {
+  txtFileInput.value = "";
+  sourceText.value = "";
+  resultText.value = "";
+  sourceInfo.textContent = "";
+  resultInfo.textContent = "";
+  currentSourceFileName = "source.txt";
+  updateCounters();
+  updateDownloadButtons();
+  clearStatus();
+}
+
+/*
+================================
+ЗАГРУЗКА TXT
+================================
+*/
+txtFileInput.addEventListener("change", async () => {
+  clearStatus();
+
+  const file = txtFileInput.files[0] || null;
+
+  if (!file) {
+    sourceInfo.textContent = "";
+    return;
+  }
+
+  try {
+    const text = await readTextFile(file);
+
+    sourceText.value = text;
+    currentSourceFileName = file.name;
+
+    sourceInfo.textContent =
+      "Name: " + file.name + "\n" +
+      "Type: " + (file.type || "text/plain") + "\n" +
+      "Size: " + formatSize(file.size);
+
+    resultInfo.textContent = "";
+    resultText.value = "";
+
+    updateCounters();
+    updateDownloadButtons();
+
+    setStatus("TXT loaded OK");
+  } catch (error) {
+    setStatus("ERROR: " + (error.message || error));
+  }
+});
+
+/*
+================================
+РЕАКЦИЯ НА РЕДАКТИРОВАНИЕ ТЕКСТА
+================================
+*/
+sourceText.addEventListener("input", () => {
+  updateCounters();
+  updateDownloadButtons();
+});
+
+resultText.addEventListener("input", () => {
+  updateCounters();
+  updateDownloadButtons();
+});
+
+targetLang.addEventListener("change", () => {
+  updateResultDirection();
+});
+
+/*
+================================
+ПОМЕНЯТЬ ЯЗЫКИ И ТЕКСТЫ МЕСТАМИ
+================================
+*/
+swapBtn.addEventListener("click", () => {
+  const oldSourceLang = sourceLang.value;
+  sourceLang.value = targetLang.value;
+  targetLang.value = oldSourceLang;
+
+  const oldSourceText = sourceText.value;
+  sourceText.value = resultText.value;
+  resultText.value = oldSourceText;
+
+  updateResultDirection();
+  updateCounters();
+  updateDownloadButtons();
+
+  setStatus("swap OK");
+});
+
+/*
+================================
+ПЕРЕВОД
+================================
+*/
+translateBtn.addEventListener("click", async () => {
+  clearStatus();
+
+  const inputText = sourceText.value.trim();
+  const endpoint = apiUrl.value.trim();
+  const key = apiKey.value.trim();
+
+  if (!inputText) {
+    setStatus("ERROR: source text is empty");
+    return;
+  }
+
+  if (!endpoint) {
+    setStatus("ERROR: API URL is empty");
+    return;
+  }
+
+  try {
+    translateBtn.disabled = true;
+    resultInfo.textContent = "";
+
+    /*
+      Формируем тело запроса под LibreTranslate API
+    */
+    const payload = {
+      q: inputText,
+      source: sourceLang.value,
+      target: targetLang.value,
+      format: "text"
+    };
+
+    /*
+      API key добавляем только если он реально задан
+    */
+    if (key) {
+      payload.api_key = key;
+    }
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        "translation request failed: " +
+        response.status +
+        " " +
+        errorText
+      );
+    }
+
+    const data = await response.json();
+
+    /*
+      Ожидаем поле translatedText
+    */
+    if (!data || typeof data.translatedText !== "string") {
+      throw new Error("translatedText not found in response");
+    }
+
+    resultText.value = data.translatedText;
+
+    resultInfo.textContent =
+      "Source lang: " + sourceLang.value + "\n" +
+      "Target lang: " + targetLang.value + "\n" +
+      "Result length: " + resultText.value.length + " chars";
+
+    updateResultDirection();
+    updateCounters();
+    updateDownloadButtons();
+
+    setStatus("translate OK");
+  } catch (error) {
+    setStatus("ERROR: " + (error.message || error));
+  } finally {
+    translateBtn.disabled = false;
+  }
+});
+
+/*
+================================
+СКАЧАТЬ SOURCE TXT
+================================
+*/
+downloadSourceBtn.addEventListener("click", () => {
+  const text = sourceText.value;
+
+  if (!text.trim()) {
+    setStatus("ERROR: source text is empty");
+    return;
+  }
+
+  const baseName = getBaseName(currentSourceFileName);
+  downloadTextAsTxt(text, baseName + "_source.txt");
+
+  setStatus("save source TXT OK");
+});
+
+/*
+================================
+СКАЧАТЬ RESULT TXT
+================================
+*/
+downloadResultBtn.addEventListener("click", () => {
+  const text = resultText.value;
+
+  if (!text.trim()) {
+    setStatus("ERROR: result text is empty");
+    return;
+  }
+
+  const baseName = getBaseName(currentSourceFileName);
+  downloadTextAsTxt(text, baseName + "_translated_" + targetLang.value + ".txt");
+
+  setStatus("save result TXT OK");
+});
+
+/*
+================================
+ОЧИСТИТЬ
+================================
+*/
+clearBtn.addEventListener("click", () => {
+  clearAll();
+});
+
+/*
+================================
+СТАРТ
+================================
+*/
+updateCounters();
+updateDownloadButtons();
+updateResultDirection();
+</script>
+
+
+
+<!-- ========================================
+     SERVICE CONSOLE
+     Верхняя строка редактируется вручную
+     Здесь задается:
+     - название страницы
+     - номер версии
+======================================== -->
+
+<div id="service-console">
+
+  <div class="row" id="build-top">
+start | v1.0.0
+  </div>
+
+  <div class="row" id="build-down">
+    deploy: --
+  </div>
+
+</div>
+
+<!-- ========================================
+     SCRIPT
+     Автоматически выводит:
+     - дату
+     - время
+     Момент загрузки страницы
+======================================== -->
+
+<script>
+(function () {
+  const now = new Date();
+
+  const pad = n =>
+    String(n).padStart(2, "0");
+
+  const date =
+      pad(now.getDate())
+    + "."
+    + pad(now.getMonth() + 1)
+    + "."
+    + now.getFullYear();
+
+  const time =
+      pad(now.getHours())
+    + ":"
+    + pad(now.getMinutes());
+
+  document
+    .getElementById("build-down")
+    .textContent =
+      "deploy: "
+      + date
+      + " "
+      + time;
+})();
+</script>
+
+  </body>
+</html>
+     
+</body>
+</html>
