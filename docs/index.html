@@ -696,7 +696,8 @@ const undoBtn = document.getElementById("undoBtn");
 const applyBtn = document.getElementById("applyBtn");
 const makeAvatarBtn = document.getElementById("makeAvatarBtn");
 const downloadBtn = document.getElementById("downloadBtn");
-
+/* Кнопка сохранения всегда активна */
+downloadBtn.disabled = false;
 const cropPanel = document.getElementById("cropPanel");
 const colorPanel = document.getElementById("colorPanel");
 
@@ -809,6 +810,8 @@ photoInput.addEventListener("change", async (event) => {
     drawEditor();
     updateHistoryButtons();
 
+downloadBtn.disabled = false;
+     
     backToOriginalBtn.disabled = false;
     setStatus("file loaded OK");
   } catch (error) {
@@ -1055,35 +1058,77 @@ document
   .getElementById("downloadBtn")
   .addEventListener("click", async () => {
 
-    if (!processedFile) {
-      setStatus("ERROR: no result to save");
+    /*
+      Сохраняем:
+      1) готовый результат, если он уже есть
+      2) иначе — текущий файл редактора
+    */
+    const fileToSave = processedFile || sourceFile;
+
+    if (!fileToSave) {
+      setStatus("ERROR: no file to save");
       return;
     }
 
     try {
       const format = outputFormat.value;
 
+      /*
+        Для экспорта берём:
+        - processedFile, если он уже готов
+        - иначе сначала собираем текущий вид в webp
+      */
+      let exportFile = fileToSave;
+
+      if (!processedFile) {
+        exportFile = await buildFinalFile(fileToSave, {
+          useCrop: activeMode === "crop" && !!cropRect,
+          cropRectCanvas: cropRect,
+          canvasWidth: editCanvas.width,
+          canvasHeight: editCanvas.height,
+          imageWidth: imageNaturalWidth,
+          imageHeight: imageNaturalHeight,
+          useResize: activeMode === "resize" || resizeView.zoom > 1 || !isResizeDefault(),
+          resizeView,
+          targetSize: Number(photoSize.value),
+          colorState,
+          quality: Number(qualityInput.value) || 0.75
+        });
+      }
+
+      /*
+        WEBP
+      */
       if (format === "webp") {
-        await downloadWebp(processedFile);
+        await downloadFileDirect(exportFile);
         setStatus("save to disk OK");
         return;
       }
 
+      /*
+        SVG
+        Это SVG-контейнер со встроенной картинкой
+      */
       if (format === "svg") {
-        const svgFile = await buildSvgFileFromImageFile(processedFile);
+        const svgFile = await buildSvgFileFromImageFile(exportFile);
         await downloadFileDirect(svgFile);
         setStatus("save to disk OK");
         return;
       }
 
+      /*
+        PDF
+      */
       if (format === "pdf") {
-        const pdfBlob = await buildPdfBlobFromImageFile(processedFile);
-        const baseName = getBaseName(processedFile.name);
+        const pdfBlob = await buildPdfBlobFromImageFile(exportFile);
+        const baseName = getBaseName(exportFile.name);
+
         const pdfFile = new File(
           [pdfBlob],
           baseName + ".pdf",
           { type: "application/pdf" }
         );
+
         await downloadFileDirect(pdfFile);
         setStatus("save to disk OK");
         return;
@@ -2302,7 +2347,13 @@ function resetResult() {
   resultPreview.src = "";
   resultPreview.style.display = "none";
   resultInfo.textContent = "";
-  downloadBtn.disabled = true;
+  
+   /*
+    Кнопку Save to disk НЕ выключаем.
+    Сохранять можно либо результат, либо текущий файл редактора.
+  
+  downloadBtn.disabled = true; */
+  downloadBtn.disabled = false; 
 }
 </script>
 
@@ -2317,7 +2368,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-save PDF | v2.1.0
+save button | v2.2.0
   </div>
 
   <div class="row" id="build-down">
