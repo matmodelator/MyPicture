@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -9,12 +8,15 @@
 
 <title>edit-photo</title>
 
+<!-- Библиотека для создания PDF -->
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
-
-  
 <style>
-<!-- СТИЛЬ КОНСОЛИ -->
-  #service-console {
+/* ========================================
+   СТИЛЬ КОНСОЛИ
+======================================== */
+
+#service-console {
   position: fixed;
   left: 0;
   bottom: 0;
@@ -32,7 +34,7 @@
 #service-console .row {
   display: block;
 }
-  
+
 body {
   font-family: Arial, sans-serif;
   background: #f4f6f8;
@@ -230,28 +232,18 @@ button.active {
    ЦВЕТА СТАТУСА
 ======================================== */
 
-/* ========================================
-   ЦВЕТА СТАТУСА
-======================================== */
-
 .status-ok {
-
-  color: #15803d;   /* зеленый */
-
+  color: #15803d;
 }
 
 .status-error {
-
-  color: #b91c1c;   /* красный */
-
+  color: #b91c1c;
 }
 
 .status-warn {
-
-  color: #ca8a04;   /* желтый */
-
+  color: #ca8a04;
 }
-  
+
 /* ========================================
    ОБЛАСТИ РЕДАКТОРА
 ======================================== */
@@ -310,7 +302,7 @@ button.active {
 }
 
 /* ========================================
-   ПАНЕЛИ РЕЖИМОВ
+   ПАНЕЛИ РЕЖИМОВ И НАСТРОЕК
 ======================================== */
 
 .mode-panel {
@@ -327,7 +319,8 @@ button.active {
 }
 
 .color-grid,
-.crop-grid {
+.crop-grid,
+.pdf-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
   gap: 14px 18px;
@@ -418,12 +411,55 @@ button.active {
         >
       </div>
 
-      <!-- Качество webp -->
+      <!-- Качество -->
       <div class="field">
         <label for="quality">Quality</label>
         <input id="quality" type="number" value="0.75" min="0.1" max="1" step="0.05">
       </div>
 
+      <!-- Новый блок выбора формата -->
+      <div class="field">
+        <label for="outputFormat">Format</label>
+        <select id="outputFormat">
+          <option value="webp">webp</option>
+          <option value="pdf">pdf</option>
+          <option value="svg">svg</option>
+        </select>
+      </div>
+
+    </div>
+
+    <!-- Блок настроек PDF -->
+    <div id="pdfPanel" class="mode-panel">
+      <div class="pdf-grid">
+
+        <div class="field">
+          <label for="pdfPageFormat">PDF page</label>
+          <select id="pdfPageFormat">
+            <option value="a4">A4</option>
+            <option value="letter">Letter</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="pdfOrientation">Orientation</label>
+          <select id="pdfOrientation">
+            <option value="portrait">Portrait</option>
+            <option value="landscape">Landscape</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="pdfMargin">Margin (mm)</label>
+          <input id="pdfMargin" type="number" value="10" min="0" max="50" step="1">
+        </div>
+
+      </div>
+
+      <div class="note">
+PDF создаётся из текущего результата.
+Изображение вписывается в страницу с указанными полями и ориентацией.
+      </div>
     </div>
 
     <div class="toolbar">
@@ -470,14 +506,14 @@ button.active {
         </div>
 
         <div class="actions">
-  <button type="button" id="downloadBtn">
-    Save to disk
-  </button>
+          <button type="button" id="downloadBtn">
+            Save to disk
+          </button>
 
-  <button type="button" id="uploadMvpBtn">
-    Upload to MVP
-  </button>
-</div>
+          <button type="button" id="uploadMvpBtn">
+            Upload to MVP
+          </button>
+        </div>
 
       </div>
     </div>
@@ -534,6 +570,7 @@ Resize: activate the button, click to set center, use wheel or pinch to zoom, dr
 Color: activate the button and adjust sliders.
 Apply: makes the result the new editor image and also shows it on the right.
 Avatar: creates a round avatar and also loads it back into the editor.
+Format: affects Save to disk.
     </div>
   </div>
 
@@ -641,6 +678,15 @@ const qualityInput = document.getElementById("quality");
 const photoSize = document.getElementById("photoSize");
 const photoSizeValue = document.getElementById("photoSizeValue");
 
+/* Новый выбор формата */
+const outputFormat = document.getElementById("outputFormat");
+
+/* Новый блок PDF */
+const pdfPanel = document.getElementById("pdfPanel");
+const pdfPageFormat = document.getElementById("pdfPageFormat");
+const pdfOrientation = document.getElementById("pdfOrientation");
+const pdfMargin = document.getElementById("pdfMargin");
+
 const cropModeBtn = document.getElementById("cropModeBtn");
 const resizeModeBtn = document.getElementById("resizeModeBtn");
 const colorModeBtn = document.getElementById("colorModeBtn");
@@ -685,10 +731,6 @@ const tipWraps = document.querySelectorAll("[data-tip-wrap]");
 
 tipWraps.forEach((wrap) => {
   wrap.addEventListener("click", (event) => {
-    /*
-      Если клик по уже закреплённой кнопке — снимаем закрепление.
-      Если клик по другой — закрепляем только её.
-    */
     const alreadyPinned = wrap.classList.contains("pinned");
 
     tipWraps.forEach((item) => item.classList.remove("pinned"));
@@ -715,6 +757,21 @@ document.addEventListener("click", () => {
 photoSize.addEventListener("input", () => {
   photoSizeValue.textContent = photoSize.value + " px";
 });
+
+/*
+================================
+ПЕРЕКЛЮЧЕНИЕ БЛОКА PDF
+================================
+*/
+
+outputFormat.addEventListener("change", updateFormatUI);
+
+function updateFormatUI() {
+  pdfPanel.classList.toggle("visible", outputFormat.value === "pdf");
+}
+
+/* Инициализация состояния блока PDF */
+updateFormatUI();
 
 /*
 ================================
@@ -995,30 +1052,49 @@ backToOriginalBtn.addEventListener("click", async () => {
 */
 
 document
-  .getElementById('downloadBtn')
-  .addEventListener('click', () => {
+  .getElementById("downloadBtn")
+  .addEventListener("click", async () => {
 
     if (!processedFile) {
-      setStatus('ERROR: no result to save');
+      setStatus("ERROR: no result to save");
       return;
     }
 
-    const downloadUrl =
-      URL.createObjectURL(processedFile);
+    try {
+      const format = outputFormat.value;
 
-    const link =
-      document.createElement('a');
+      if (format === "webp") {
+        await downloadWebp(processedFile);
+        setStatus("save to disk OK");
+        return;
+      }
 
-    link.href = downloadUrl;
-    link.download = processedFile.name || 're-photo.webp';
-    link.click();
+      if (format === "svg") {
+        const svgFile = await buildSvgFileFromImageFile(processedFile);
+        await downloadFileDirect(svgFile);
+        setStatus("save to disk OK");
+        return;
+      }
 
-    setTimeout(() => {
-      URL.revokeObjectURL(downloadUrl);
-    }, 1000);
+      if (format === "pdf") {
+        const pdfBlob = await buildPdfBlobFromImageFile(processedFile);
+        const baseName = getBaseName(processedFile.name);
+        const pdfFile = new File(
+          [pdfBlob],
+          baseName + ".pdf",
+          { type: "application/pdf" }
+        );
+        await downloadFileDirect(pdfFile);
+        setStatus("save to disk OK");
+        return;
+      }
 
-    setStatus('save to disk OK');
+      setStatus("ERROR: unknown format");
+    } catch (error) {
+      setStatus("ERROR: " + (error.message || error));
+    }
   });
+
 /*
 ================================
 ЗАГРУЗИТЬ РЕЗУЛЬТАТ в ГАЛЕРЕЮ
@@ -1026,11 +1102,11 @@ document
 */
 
 document
-  .getElementById('uploadMvpBtn')
-  .addEventListener('click', async () => {
+  .getElementById("uploadMvpBtn")
+  .addEventListener("click", async () => {
 
     if (!processedFile) {
-      setStatus('ERROR: no result to upload');
+      setStatus("ERROR: no result to upload");
       return;
     }
 
@@ -1039,49 +1115,49 @@ document
         new URLSearchParams(window.location.search);
 
       const slot =
-        params.get('slot')
-        || localStorage.getItem('mvp_photo_slot')
-        || '0';
+        params.get("slot")
+        || localStorage.getItem("mvp_photo_slot")
+        || "0";
 
       const returnPage =
-        params.get('from')
-        || localStorage.getItem('mvp_photo_return')
-        || 'gallery.html';
+        params.get("from")
+        || localStorage.getItem("mvp_photo_return")
+        || "gallery.html";
 
       const dataUrl =
         await readFileAsDataURL(processedFile);
 
       localStorage.setItem(
-        'rephoto_result',
+        "rephoto_result",
         dataUrl
       );
 
       localStorage.setItem(
-        'mvp_photo_slot',
+        "mvp_photo_slot",
         String(slot)
       );
 
       localStorage.setItem(
-        'mvp_photo_return',
+        "mvp_photo_return",
         returnPage
       );
 
       setStatus(
-        'upload to MVP OK'
+        "upload to MVP OK"
       );
 
       window.location.href =
-        'up-photo.html?slot='
+        "up-photo.html?slot="
         + encodeURIComponent(slot);
 
     } catch (error) {
       setStatus(
-        'ERROR: ' +
+        "ERROR: " +
         (error.message || error)
       );
     }
   });
-  
+
 /*
 ================================
 РАБОТА С ИСТОРИЕЙ
@@ -1128,7 +1204,7 @@ async function loadSourceFileIntoEditor(file) {
   editCanvas.height = Math.round(img.height * scale);
   editCanvas.style.display = "block";
 
-   originalInfo.textContent =
+  originalInfo.textContent =
     "Name: " + file.name + "\n" +
     "Type: " + file.type + "\n" +
     "Size: " + formatSize(file.size) + "\n" +
@@ -1410,11 +1486,6 @@ async function buildFinalFile(file, options = {}) {
   let srcW = imageWidth;
   let srcH = imageHeight;
 
-  /*
-    Если resize реально используется — берём resize rect.
-    Иначе, если активен crop — берём crop.
-    Иначе — всю картинку.
-  */
   if (useResize) {
     const rect = getResizeSourceRect();
     srcX = Math.round(rect.srcX);
@@ -1436,10 +1507,6 @@ async function buildFinalFile(file, options = {}) {
   srcW = clamp(srcW, 1, imageWidth - srcX);
   srcH = clamp(srcH, 1, imageHeight - srcY);
 
-  /*
-    Один выбранный размер: 400–1200.
-    Используем его как максимум по большей стороне.
-  */
   const scale = Math.min(
     targetSize / srcW,
     targetSize / srcH,
@@ -1503,10 +1570,6 @@ async function buildAvatarFile(file, options = {}) {
 
   let srcX, srcY, srcW, srcH;
 
-  /*
-    Если есть cropRect — берём его, но приводим к квадрату.
-    Если cropRect нет — берём квадрат по центру.
-  */
   if (cropRectCanvas) {
     const scaleX = imageWidth / canvasWidth;
     const scaleY = imageHeight / canvasHeight;
@@ -1542,7 +1605,6 @@ async function buildAvatarFile(file, options = {}) {
   const outCtx = outCanvas.getContext("2d");
   if (!outCtx) throw new Error("Canvas context unavailable");
 
-  /* Круглая маска */
   outCtx.save();
   outCtx.beginPath();
   outCtx.arc(
@@ -1603,14 +1665,12 @@ async function showResult(file) {
     ? (((referenceSize - file.size) / referenceSize) * 100).toFixed(1)
     : "0";
 
- resultInfo.textContent =
-  "Name: " + file.name + "\n" +
-  "Type: " + file.type + "\n" +
-  "Size: " + formatSize(file.size) + "\n" +
-  "Resolution: " + meta.width + " × " + meta.height + "\n" +
-  "Saved: " + savedPercent + "%";
-
-  downloadBtn.disabled = false;
+  resultInfo.textContent =
+    "Name: " + file.name + "\n" +
+    "Type: " + file.type + "\n" +
+    "Size: " + formatSize(file.size) + "\n" +
+    "Resolution: " + meta.width + " × " + meta.height + "\n" +
+    "Saved: " + savedPercent + "%";
 }
 
 /*
@@ -1938,10 +1998,6 @@ function setResizeCenterFromCanvasPoint(canvasX, canvasY) {
 }
 
 function panResizeView(currentCanvasX, currentCanvasY) {
-  /*
-    Берём размеры окна от стартового состояния.
-    Так drag работает стабильно и без рывков.
-  */
   const zoom = Math.max(1, resizeView.zoom);
 
   let srcW = imageNaturalWidth / zoom;
@@ -1967,6 +2023,125 @@ function panResizeView(currentCanvasX, currentCanvasY) {
 
   resizeView.centerX = clamp(resizeView.centerX, 0, imageNaturalWidth);
   resizeView.centerY = clamp(resizeView.centerY, 0, imageNaturalHeight);
+}
+
+/*
+================================
+НОВЫЕ ФУНКЦИИ СОХРАНЕНИЯ:
+WEBP / SVG / PDF
+================================
+*/
+
+/* Простое скачивание уже готового файла */
+async function downloadWebp(file) {
+  await downloadFileDirect(file);
+}
+
+/*
+  Создание SVG:
+  это не векторизация,
+  а SVG-контейнер со встроенной картинкой.
+*/
+async function buildSvgFileFromImageFile(file) {
+  const dataUrl = await readFileAsDataURL(file);
+  const image = await loadImage(dataUrl);
+
+  const svgText =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${image.width}" height="${image.height}" viewBox="0 0 ${image.width} ${image.height}">` +
+    `<image href="${dataUrl}" width="${image.width}" height="${image.height}" />` +
+    `</svg>`;
+
+  const baseName = getBaseName(file.name);
+
+  return new File(
+    [svgText],
+    baseName + ".svg",
+    { type: "image/svg+xml" }
+  );
+}
+
+/*
+  Создание PDF:
+  берём текущую картинку,
+  вставляем на страницу PDF с полями.
+*/
+async function buildPdfBlobFromImageFile(file) {
+  const dataUrl = await readFileAsDataURL(file);
+  const image = await loadImage(dataUrl);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = image.width;
+  canvas.height = image.height;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("PDF canvas context unavailable");
+  }
+
+  ctx.drawImage(image, 0, 0);
+
+  /*
+    Для PDF используем JPEG-представление,
+    так jsPDF работает стабильно и предсказуемо.
+  */
+  const jpegDataUrl = canvas.toDataURL("image/jpeg", clamp(Number(qualityInput.value) || 0.75, 0.1, 1));
+
+  const { jsPDF } = window.jspdf;
+
+  const doc = new jsPDF({
+    orientation: pdfOrientation.value,
+    unit: "mm",
+    format: pdfPageFormat.value
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = Math.max(0, Number(pdfMargin.value) || 0);
+
+  const maxWidth = pageWidth - margin * 2;
+  const maxHeight = pageHeight - margin * 2;
+
+  const imageRatio = image.width / image.height;
+  let drawWidth = maxWidth;
+  let drawHeight = drawWidth / imageRatio;
+
+  if (drawHeight > maxHeight) {
+    drawHeight = maxHeight;
+    drawWidth = drawHeight * imageRatio;
+  }
+
+  const x = (pageWidth - drawWidth) / 2;
+  const y = (pageHeight - drawHeight) / 2;
+
+  doc.addImage(
+    jpegDataUrl,
+    "JPEG",
+    x,
+    y,
+    drawWidth,
+    drawHeight
+  );
+
+  return doc.output("blob");
+}
+
+/* Универсальное скачивание файла */
+async function downloadFileDirect(file) {
+  const downloadUrl = URL.createObjectURL(file);
+
+  const link = document.createElement("a");
+  link.href = downloadUrl;
+  link.download = file.name || "download";
+  link.click();
+
+  setTimeout(() => {
+    URL.revokeObjectURL(downloadUrl);
+  }, 1000);
+}
+
+/* Получение имени файла без расширения */
+function getBaseName(fileName) {
+  return String(fileName || "result").replace(/\.[^/.]+$/, "");
 }
 
 /*
@@ -2073,12 +2248,7 @@ ERROR  → красный
 */
 
 function setStatus(text) {
-
   statusBox.textContent = text;
-
-  /*
-  убрать старые классы
-  */
 
   statusBox.classList.remove(
     "status-ok",
@@ -2087,55 +2257,23 @@ function setStatus(text) {
   );
 
   if (typeof text !== "string") {
-
-    statusBox.classList.add(
-      "status-warn"
-    );
-
+    statusBox.classList.add("status-warn");
     return;
-
   }
 
-  const upper =
-    text.toUpperCase();
-
-  /*
-  зеленый
-  */
+  const upper = text.toUpperCase();
 
   if (upper.includes("OK")) {
-
-    statusBox.classList.add(
-      "status-ok"
-    );
-
+    statusBox.classList.add("status-ok");
     return;
-
   }
-
-  /*
-  красный
-  */
 
   if (upper.includes("ERROR")) {
-
-    statusBox.classList.add(
-      "status-error"
-    );
-
+    statusBox.classList.add("status-error");
     return;
-
   }
 
-  /*
-  иначе — желтый
-  */
-
-  statusBox.classList.add(
-    "status-warn"
-
-  );
-
+  statusBox.classList.add("status-warn");
 }
 
 function clearStatus() {
@@ -2168,9 +2306,6 @@ function resetResult() {
 }
 </script>
 
-
-
-
 <!-- ========================================
      SERVICE CONSOLE
      Верхняя строка редактируется вручную
@@ -2182,16 +2317,11 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-
-    <!-- ВВОД ВРУЧНУЮ -->
-save from re-photo + console | v2.0.0
-
+save PDF | v2.1.0
   </div>
 
   <div class="row" id="build-down">
-
     deploy: --
-
   </div>
 
 </div>
@@ -2205,47 +2335,33 @@ save from re-photo + console | v2.0.0
 ======================================== -->
 
 <script>
-
 (function () {
-
-  /* Текущая дата и время */
-
   const now = new Date();
 
-  /* Добавляет ведущий ноль */
-
   const pad = n =>
-    String(n).padStart(2, '0');
-
-  /* Формат даты */
+    String(n).padStart(2, "0");
 
   const date =
       pad(now.getDate())
-    + '.'
+    + "."
     + pad(now.getMonth() + 1)
-    + '.'
+    + "."
     + now.getFullYear();
-
-  /* Формат времени */
 
   const time =
       pad(now.getHours())
-    + ':'
+    + ":"
     + pad(now.getMinutes());
 
-  /* Вывод в нижнюю строку */
-
   document
-    .getElementById('build-down')
+    .getElementById("build-down")
     .textContent =
-      'deploy: '
+      "deploy: "
       + date
-      + ' '
+      + " "
       + time;
-
 })();
-
 </script>
 
-  </body>
-</html>    
+</body>
+</html>
