@@ -20,6 +20,7 @@
 body {
   margin: 0;
   padding: 24px;
+  padding-bottom: 48px;
   font-family: Arial, sans-serif;
   background: #f4f6f8;
   color: #1e293b;
@@ -73,6 +74,11 @@ h3 {
   background: #fff;
 }
 
+.field input[readonly] {
+  background: #f1f5f9;
+  color: #475569;
+}
+
 button {
   border: none;
   border-radius: 8px;
@@ -96,6 +102,29 @@ button.secondary:hover {
 }
 
 /* ========================================
+   МЕНЮ ПРЕСЕТОВ ДОКУМЕНТОВ
+======================================== */
+
+.preset-menu {
+  margin: 0 0 18px 0;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+}
+
+.preset-menu h3 {
+  margin: 0 0 12px 0;
+}
+
+.preset-info {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #475569;
+  white-space: pre-line;
+}
+
+/* ========================================
    СТАТУС
 ======================================== */
 
@@ -116,6 +145,13 @@ button.secondary:hover {
 
 .status-warn {
   color: #ca8a04;
+}
+
+.note {
+  margin-bottom: 18px;
+  font-size: 13px;
+  color: #64748b;
+  white-space: pre-line;
 }
 
 /* ========================================
@@ -176,7 +212,7 @@ button.secondary:hover {
 
 .fit-cover img {
   width: 100%;
-  height: 260mm;
+  height: 100%;
   object-fit: cover;
 }
 
@@ -184,6 +220,29 @@ button.secondary:hover {
   width: auto;
   height: auto;
   max-width: 100%;
+}
+
+/* ========================================
+   КОНСОЛЬ
+======================================== */
+
+#service-console {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  padding: 6px 10px;
+  background: #111;
+  color: #8cff8c;
+  font-family: monospace;
+  font-size: 12px;
+  border-top: 1px solid #333;
+  z-index: 9999;
+  opacity: 0.9;
+}
+
+#service-console .row {
+  display: block;
 }
 
 /* ========================================
@@ -222,8 +281,6 @@ button.secondary:hover {
   }
 
   .print-page {
-    width: auto;
-    min-height: auto;
     box-shadow: none;
     margin: 0;
     page-break-after: always;
@@ -231,7 +288,7 @@ button.secondary:hover {
 
 }
 
-/* Размер страницы */
+/* Размер страницы по умолчанию */
 @page {
   size: A4 portrait;
   margin: 0;
@@ -326,6 +383,70 @@ button.secondary:hover {
 
     </div>
 
+    <!-- ========================================
+         ОТДЕЛЬНОЕ МЕНЮ ПРЕСЕТОВ ДОКУМЕНТОВ
+    ======================================== -->
+
+    <div class="preset-menu">
+
+      <h3>Document photo presets</h3>
+
+      <div class="controls">
+
+        <!-- Выбор страны -->
+        <div class="field">
+          <label for="docCountry">Country</label>
+          <select id="docCountry">
+            <option value="">Select country</option>
+          </select>
+        </div>
+
+        <!-- Выбор типа документа -->
+        <div class="field">
+          <label for="docType">Document</label>
+          <select id="docType">
+            <option value="">Select document</option>
+          </select>
+        </div>
+
+        <!-- Ширина фото -->
+        <div class="field">
+          <label for="docWidthMm">Width mm</label>
+          <input id="docWidthMm" type="number" value="" readonly>
+        </div>
+
+        <!-- Высота фото -->
+        <div class="field">
+          <label for="docHeightMm">Height mm</label>
+          <input id="docHeightMm" type="number" value="" readonly>
+        </div>
+
+        <!-- DPI -->
+        <div class="field">
+          <label for="docDpi">DPI</label>
+          <input id="docDpi" type="number" value="" readonly>
+        </div>
+
+        <!-- Фон -->
+        <div class="field">
+          <label for="docBackground">Background</label>
+          <input id="docBackground" type="text" value="" readonly>
+        </div>
+
+        <!-- Применить пресет -->
+        <div class="field">
+          <label>&nbsp;</label>
+          <button id="applyDocPresetBtn" type="button" class="secondary">
+            Apply preset
+          </button>
+        </div>
+
+      </div>
+
+      <div id="presetInfo" class="preset-info"></div>
+
+    </div>
+
     <div id="status" class="status"></div>
 
     <div class="note">
@@ -341,6 +462,210 @@ Save as PDF / Microsoft Print to PDF.
   </div>
 
 </div>
+
+<script>
+/*
+================================
+ПРЕСЕТЫ ФОТО НА ДОКУМЕНТЫ
+страна + тип документа
+================================
+*/
+
+const documentPhotoPresets = {
+
+  israel: {
+    label: "Израиль",
+    documents: {
+      passport: {
+        label: "Паспорт / biometric",
+        widthMm: 35,
+        heightMm: 45,
+        dpi: 600,
+        background: "white"
+      },
+      driver_license: {
+        label: "Права",
+        widthMm: 35,
+        heightMm: 45,
+        dpi: 600,
+        background: "white"
+      }
+    }
+  },
+
+  russia: {
+    label: "РФ",
+    documents: {
+      passport: {
+        label: "Паспорт",
+        widthMm: 35,
+        heightMm: 45,
+        dpi: 600,
+        background: "light"
+      },
+      international_passport: {
+        label: "Загранпаспорт",
+        widthMm: 35,
+        heightMm: 45,
+        dpi: 600,
+        background: "light"
+      },
+      driver_license: {
+        label: "Права",
+        widthMm: 35,
+        heightMm: 45,
+        dpi: 600,
+        background: "light"
+      }
+    }
+  },
+
+  belarus: {
+    label: "Беларусь",
+    documents: {
+      passport: {
+        label: "Паспорт",
+        widthMm: 35,
+        heightMm: 45,
+        dpi: 600,
+        background: "light"
+      }
+    }
+  },
+
+  ukraine: {
+    label: "Украина",
+    documents: {
+      passport: {
+        label: "Паспорт",
+        widthMm: 35,
+        heightMm: 45,
+        dpi: 600,
+        background: "light"
+      }
+    }
+  },
+
+  moldova: {
+    label: "Молдова",
+    documents: {
+      passport: {
+        label: "Паспорт / ID",
+        widthMm: 30,
+        heightMm: 40,
+        dpi: 600,
+        background: "light"
+      },
+      visa: {
+        label: "Виза",
+        widthMm: 35,
+        heightMm: 45,
+        dpi: 600,
+        background: "light"
+      }
+    }
+  },
+
+  georgia: {
+    label: "Грузия",
+    documents: {
+      passport: {
+        label: "Паспорт",
+        widthMm: 35,
+        heightMm: 45,
+        dpi: 600,
+        background: "light"
+      }
+    }
+  },
+
+  armenia: {
+    label: "Армения",
+    documents: {
+      passport: {
+        label: "Паспорт",
+        widthMm: 35,
+        heightMm: 45,
+        dpi: 600,
+        background: "light"
+      }
+    }
+  },
+
+  azerbaijan: {
+    label: "Азербайджан",
+    documents: {
+      passport: {
+        label: "Паспорт",
+        widthMm: 35,
+        heightMm: 45,
+        dpi: 600,
+        background: "light"
+      }
+    }
+  },
+
+  kazakhstan: {
+    label: "Казахстан",
+    documents: {
+      passport: {
+        label: "Паспорт",
+        widthMm: 35,
+        heightMm: 45,
+        dpi: 600,
+        background: "off-white"
+      },
+      id_card: {
+        label: "ID card",
+        widthMm: 35,
+        heightMm: 45,
+        dpi: 600,
+        background: "off-white"
+      }
+    }
+  },
+
+  uzbekistan: {
+    label: "Узбекистан",
+    documents: {
+      passport: {
+        label: "Паспорт",
+        widthMm: 35,
+        heightMm: 45,
+        dpi: 600,
+        background: "light"
+      }
+    }
+  },
+
+  tajikistan: {
+    label: "Таджикистан",
+    documents: {
+      passport: {
+        label: "Паспорт",
+        widthMm: 35,
+        heightMm: 45,
+        dpi: 600,
+        background: "light"
+      }
+    }
+  },
+
+  kyrgyzstan: {
+    label: "Кыргызстан",
+    documents: {
+      passport: {
+        label: "Паспорт",
+        widthMm: 35,
+        heightMm: 45,
+        dpi: 600,
+        background: "light"
+      }
+    }
+  }
+
+};
+</script>
 
 <script>
 /*
@@ -378,6 +703,38 @@ const printArea =
 
 const statusBox =
   document.getElementById("status");
+
+/*
+================================
+DOM: ПРЕСЕТЫ ДОКУМЕНТОВ
+================================
+*/
+
+const docCountry =
+  document.getElementById("docCountry");
+
+const docType =
+  document.getElementById("docType");
+
+const docWidthMm =
+  document.getElementById("docWidthMm");
+
+const docHeightMm =
+  document.getElementById("docHeightMm");
+
+const docDpi =
+  document.getElementById("docDpi");
+
+const docBackground =
+  document.getElementById("docBackground");
+
+const applyDocPresetBtn =
+  document.getElementById("applyDocPresetBtn");
+
+const presetInfo =
+  document.getElementById("presetInfo");
+
+let activeDocumentPreset = null;
 
 /*
 ================================
@@ -613,7 +970,6 @@ async function addTextFile(file) {
 /*
 ================================
 ДОБАВИТЬ PDF
-================================
 ВАЖНО:
 браузер не печатает PDF внутри canvas здесь.
 Мы добавляем PDF как iframe-страницу.
@@ -714,6 +1070,192 @@ async function buildPreview() {
 
 /*
 ================================
+МЕНЮ ПРЕСЕТОВ ДОКУМЕНТОВ
+================================
+*/
+
+function initDocumentPresetMenu() {
+
+  docCountry.innerHTML =
+    '<option value="">Select country</option>';
+
+  Object.keys(documentPhotoPresets).forEach((countryKey) => {
+
+    const country =
+      documentPhotoPresets[countryKey];
+
+    const option =
+      document.createElement("option");
+
+    option.value =
+      countryKey;
+
+    option.textContent =
+      country.label;
+
+    docCountry.appendChild(option);
+
+  });
+
+}
+
+function fillDocumentTypes() {
+
+  const countryKey =
+    docCountry.value;
+
+  docType.innerHTML =
+    '<option value="">Select document</option>';
+
+  clearDocumentPresetFields();
+
+  if (
+    !countryKey ||
+    !documentPhotoPresets[countryKey]
+  ) {
+    return;
+  }
+
+  const documents =
+    documentPhotoPresets[countryKey].documents;
+
+  Object.keys(documents).forEach((docKey) => {
+
+    const doc =
+      documents[docKey];
+
+    const option =
+      document.createElement("option");
+
+    option.value =
+      docKey;
+
+    option.textContent =
+      doc.label;
+
+    docType.appendChild(option);
+
+  });
+
+}
+
+function showSelectedDocumentPreset() {
+
+  const countryKey =
+    docCountry.value;
+
+  const docKey =
+    docType.value;
+
+  if (
+    !countryKey ||
+    !docKey ||
+    !documentPhotoPresets[countryKey] ||
+    !documentPhotoPresets[countryKey].documents[docKey]
+  ) {
+    activeDocumentPreset = null;
+    clearDocumentPresetFields();
+    return;
+  }
+
+  const country =
+    documentPhotoPresets[countryKey];
+
+  const preset =
+    country.documents[docKey];
+
+  activeDocumentPreset =
+    preset;
+
+  docWidthMm.value =
+    preset.widthMm;
+
+  docHeightMm.value =
+    preset.heightMm;
+
+  docDpi.value =
+    preset.dpi;
+
+  docBackground.value =
+    preset.background || "";
+
+  presetInfo.textContent =
+    "Country: " + country.label + "\n" +
+    "Document: " + preset.label + "\n" +
+    "Size: " + preset.widthMm + " × " + preset.heightMm + " mm\n" +
+    "DPI: " + preset.dpi + "\n" +
+    "Background: " + (preset.background || "-");
+
+}
+
+function clearDocumentPresetFields() {
+
+  activeDocumentPreset = null;
+
+  docWidthMm.value = "";
+  docHeightMm.value = "";
+  docDpi.value = "";
+  docBackground.value = "";
+
+  presetInfo.textContent = "";
+
+}
+
+function applyDocumentPresetToPrint() {
+
+  if (!activeDocumentPreset) {
+    setStatus("ERROR: select document preset");
+    return;
+  }
+
+  const pages =
+    printArea.querySelectorAll(".print-page");
+
+  if (!pages.length) {
+    setStatus("ERROR: build preview first");
+    return;
+  }
+
+  /*
+    Пресет документа применяется как отдельный размер страницы.
+    Например: 35 × 45 мм.
+  */
+
+  pages.forEach((page) => {
+
+    page.style.width =
+      activeDocumentPreset.widthMm + "mm";
+
+    page.style.minHeight =
+      activeDocumentPreset.heightMm + "mm";
+
+    page.style.padding =
+      "0mm";
+
+    page.classList.remove(
+      "fit-contain",
+      "fit-cover",
+      "fit-original"
+    );
+
+    page.classList.add(
+      "fit-cover"
+    );
+
+  });
+
+  setStatus(
+    "document preset OK: " +
+    activeDocumentPreset.widthMm +
+    "x" +
+    activeDocumentPreset.heightMm +
+    " mm"
+  );
+
+}
+
+/*
+================================
 ПЕЧАТЬ / СОХРАНЕНИЕ В PDF
 ================================
 */
@@ -761,6 +1303,7 @@ clearBtn.addEventListener("click", () => {
 
   fileInput.value = "";
   printArea.innerHTML = "";
+  clearDocumentPresetFields();
   setStatus("clear OK");
 
 });
@@ -785,43 +1328,44 @@ fitMode.addEventListener(
   refreshExistingPages
 );
 
+/*
+================================
+СОБЫТИЯ ПРЕСЕТОВ ДОКУМЕНТОВ
+================================
+*/
+
+docCountry.addEventListener(
+  "change",
+  fillDocumentTypes
+);
+
+docType.addEventListener(
+  "change",
+  showSelectedDocumentPreset
+);
+
+applyDocPresetBtn.addEventListener(
+  "click",
+  applyDocumentPresetToPrint
+);
+
+/*
+================================
+СТАРТ МЕНЮ ПРЕСЕТОВ
+================================
+*/
+
+initDocumentPresetMenu();
 </script>
 
-
-
-
-
-<!--
-========================================
-КОНСОЛЬ
-========================================
--->
-
-<style>
-#service-console {
-  position: fixed;
-  left: 0;
-  bottom: 0;
-  width: 100%;
-  padding: 6px 10px;
-  background: #111;
-  color: #8cff8c;
-  font-family: monospace;
-  font-size: 12px;
-  border-top: 1px solid #333;
-  z-index: 9999;
-  opacity: 0.9;
-}
-</style>
-  
-#service-console .row {
-  display: block;
-}
+<!-- ========================================
+     SERVICE CONSOLE
+======================================== -->
 
 <div id="service-console">
 
   <div class="row" id="build-top">
-    Start  | v1.0.0
+    document presets | v2.0.0
   </div>
 
   <div class="row" id="build-down">
@@ -836,28 +1380,27 @@ fitMode.addEventListener(
   const now = new Date();
 
   const pad = n =>
-    String(n).padStart(2, '0');
+    String(n).padStart(2, "0");
 
   const date =
       pad(now.getDate())
-    + '.'
+    + "."
     + pad(now.getMonth() + 1)
-    + '.'
+    + "."
     + now.getFullYear();
 
   const time =
       pad(now.getHours())
-    + ':'
+    + ":"
     + pad(now.getMinutes());
 
   document
-    .getElementById('build-down')
+    .getElementById("build-down")
     .textContent =
-      'deploy: ' + date + ' ' + time;
+      "deploy: " + date + " " + time;
 
 })();
 </script>
 
-
 </body>
-</html>  
+</html>
