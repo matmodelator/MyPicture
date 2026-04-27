@@ -1,13 +1,827 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0" />
+
+<title>print</title>
+
+<style>
+/* ========================================
+   БАЗА
+======================================== */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 24px;
+  font-family: Arial, sans-serif;
+  background: #f4f6f8;
+  color: #1e293b;
+}
+
+.container {
+  max-width: 1320px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+}
+
+h1,
+h2,
+h3 {
+  margin-top: 0;
+}
+
+/* ========================================
+   ПАНЕЛЬ УПРАВЛЕНИЯ
+======================================== */
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 18px;
+  align-items: end;
+  margin-bottom: 18px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 14px;
+  color: #334155;
+}
+
+.field input,
+.field select,
+.field textarea {
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  min-width: 170px;
+  background: #fff;
+}
+
+button {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+button:hover {
+  background: #1d4ed8;
+}
+
+button.secondary {
+  background: #475569;
+}
+
+button.secondary:hover {
+  background: #334155;
+}
+
+/* ========================================
+   СТАТУС
+======================================== */
+
+.status {
+  min-height: 22px;
+  margin-bottom: 18px;
+  font-size: 14px;
+  white-space: pre-line;
+}
+
+.status-ok {
+  color: #15803d;
+}
+
+.status-error {
+  color: #b91c1c;
+}
+
+.status-warn {
+  color: #ca8a04;
+}
+
+/* ========================================
+   ПРЕДПРОСМОТР
+======================================== */
+
+.preview-wrap {
+  background: #e5e7eb;
+  border-radius: 12px;
+  padding: 18px;
+  overflow: auto;
+}
+
+#printArea {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: center;
+}
+
+/* ========================================
+   СТРАНИЦА ДЛЯ ПЕЧАТИ
+======================================== */
+
+.print-page {
+  width: 210mm;
+  min-height: 297mm;
+  background: white;
+  padding: 10mm;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.18);
+  page-break-after: always;
+  overflow: hidden;
+}
+
+.print-page img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  margin: 0 auto;
+}
+
+.print-text {
+  white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #111827;
+}
+
+/* ========================================
+   РЕЖИМЫ МАКЕТА
+======================================== */
+
+.fit-contain img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.fit-cover img {
+  width: 100%;
+  height: 260mm;
+  object-fit: cover;
+}
+
+.fit-original img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+}
+
+/* ========================================
+   ПЕЧАТЬ
+======================================== */
+
+@media print {
+
+  body {
+    margin: 0;
+    padding: 0;
+    background: white;
+  }
+
+  .container {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
+    border-radius: 0;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .preview-wrap {
+    padding: 0;
+    background: white;
+    border-radius: 0;
+    overflow: visible;
+  }
+
+  #printArea {
+    display: block;
+  }
+
+  .print-page {
+    width: auto;
+    min-height: auto;
+    box-shadow: none;
+    margin: 0;
+    page-break-after: always;
+  }
+
+}
+
+/* Размер страницы */
+@page {
+  size: A4 portrait;
+  margin: 0;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <div class="no-print">
+
+    <h1>Print / Save to PDF</h1>
+
+    <div class="controls">
+
+      <!-- Выбор файлов -->
+      <div class="field">
+        <label for="fileInput">Files</label>
+        <input
+          id="fileInput"
+          type="file"
+          accept="image/*,.txt,.pdf"
+          multiple
+        />
+      </div>
+
+      <!-- Размер страницы -->
+      <div class="field">
+        <label for="pageSize">Page size</label>
+        <select id="pageSize">
+          <option value="a4" selected>A4</option>
+          <option value="a5">A5</option>
+          <option value="letter">Letter</option>
+        </select>
+      </div>
+
+      <!-- Ориентация -->
+      <div class="field">
+        <label for="orientation">Orientation</label>
+        <select id="orientation">
+          <option value="portrait" selected>Portrait</option>
+          <option value="landscape">Landscape</option>
+        </select>
+      </div>
+
+      <!-- Поля -->
+      <div class="field">
+        <label for="marginMm">Margin mm</label>
+        <input
+          id="marginMm"
+          type="number"
+          value="10"
+          min="0"
+          max="50"
+          step="1"
+        />
+      </div>
+
+      <!-- Режим подгонки -->
+      <div class="field">
+        <label for="fitMode">Fit</label>
+        <select id="fitMode">
+          <option value="contain" selected>Contain</option>
+          <option value="cover">Cover</option>
+          <option value="original">Original</option>
+        </select>
+      </div>
+
+      <!-- Кнопки -->
+      <div class="field">
+        <label>&nbsp;</label>
+        <button id="buildBtn" type="button">
+          Build preview
+        </button>
+      </div>
+
+      <div class="field">
+        <label>&nbsp;</label>
+        <button id="printBtn" type="button">
+          Print / Save PDF
+        </button>
+      </div>
+
+      <div class="field">
+        <label>&nbsp;</label>
+        <button id="clearBtn" type="button" class="secondary">
+          Clear
+        </button>
+      </div>
+
+    </div>
+
+    <div id="status" class="status"></div>
+
+    <div class="note">
+Для вывода в файл нажми Print / Save PDF и в окне печати выбери:
+Save as PDF / Microsoft Print to PDF.
+    </div>
+
+  </div>
+
+  <!-- Область печати -->
+  <div class="preview-wrap">
+    <div id="printArea"></div>
+  </div>
+
+</div>
+
+<script>
+/*
+================================
+DOM
+================================
+*/
+
+const fileInput =
+  document.getElementById("fileInput");
+
+const pageSize =
+  document.getElementById("pageSize");
+
+const orientation =
+  document.getElementById("orientation");
+
+const marginMm =
+  document.getElementById("marginMm");
+
+const fitMode =
+  document.getElementById("fitMode");
+
+const buildBtn =
+  document.getElementById("buildBtn");
+
+const printBtn =
+  document.getElementById("printBtn");
+
+const clearBtn =
+  document.getElementById("clearBtn");
+
+const printArea =
+  document.getElementById("printArea");
+
+const statusBox =
+  document.getElementById("status");
+
+/*
+================================
+СТАТУС
+================================
+*/
+
+function setStatus(text) {
+
+  statusBox.textContent = text;
+
+  statusBox.classList.remove(
+    "status-ok",
+    "status-error",
+    "status-warn"
+  );
+
+  const upper =
+    String(text || "").toUpperCase();
+
+  if (upper.includes("OK")) {
+    statusBox.classList.add("status-ok");
+    return;
+  }
+
+  if (upper.includes("ERROR")) {
+    statusBox.classList.add("status-error");
+    return;
+  }
+
+  statusBox.classList.add("status-warn");
+}
+
+/*
+================================
+ФАЙЛЫ
+================================
+*/
+
+function readFileAsDataURL(file) {
+
+  return new Promise((resolve, reject) => {
+
+    const reader =
+      new FileReader();
+
+    reader.onload =
+      () => resolve(reader.result);
+
+    reader.onerror =
+      () => reject(new Error("file read error"));
+
+    reader.readAsDataURL(file);
+
+  });
+
+}
+
+function readFileAsText(file) {
+
+  return new Promise((resolve, reject) => {
+
+    const reader =
+      new FileReader();
+
+    reader.onload =
+      () => resolve(String(reader.result || ""));
+
+    reader.onerror =
+      () => reject(new Error("file read error"));
+
+    reader.readAsText(file, "UTF-8");
+
+  });
+
+}
+
+/*
+================================
+НАСТРОЙКА РАЗМЕРА СТРАНИЦЫ
+================================
+*/
+
+function getPageSizeMm() {
+
+  const size =
+    pageSize.value;
+
+  const orient =
+    orientation.value;
+
+  let width = 210;
+  let height = 297;
+
+  if (size === "a5") {
+    width = 148;
+    height = 210;
+  }
+
+  if (size === "letter") {
+    width = 216;
+    height = 279;
+  }
+
+  if (orient === "landscape") {
+    return {
+      width: height,
+      height: width
+    };
+  }
+
+  return {
+    width,
+    height
+  };
+
+}
+
+function applyPageSettingsToPage(page) {
+
+  const size =
+    getPageSizeMm();
+
+  const margin =
+    Math.max(
+      0,
+      Number(marginMm.value) || 0
+    );
+
+  page.style.width =
+    size.width + "mm";
+
+  page.style.minHeight =
+    size.height + "mm";
+
+  page.style.padding =
+    margin + "mm";
+
+  page.classList.remove(
+    "fit-contain",
+    "fit-cover",
+    "fit-original"
+  );
+
+  if (fitMode.value === "cover") {
+    page.classList.add("fit-cover");
+  } else if (fitMode.value === "original") {
+    page.classList.add("fit-original");
+  } else {
+    page.classList.add("fit-contain");
+  }
+
+}
+
+/*
+================================
+СОЗДАТЬ СТРАНИЦУ
+================================
+*/
+
+function createPrintPage() {
+
+  const page =
+    document.createElement("div");
+
+  page.className =
+    "print-page";
+
+  applyPageSettingsToPage(page);
+
+  return page;
+
+}
+
+/*
+================================
+ДОБАВИТЬ КАРТИНКУ
+================================
+*/
+
+async function addImageFile(file) {
+
+  const dataUrl =
+    await readFileAsDataURL(file);
+
+  const page =
+    createPrintPage();
+
+  const img =
+    document.createElement("img");
+
+  img.src =
+    dataUrl;
+
+  img.alt =
+    file.name;
+
+  page.appendChild(img);
+
+  printArea.appendChild(page);
+
+}
+
+/*
+================================
+ДОБАВИТЬ TXT
+================================
+*/
+
+async function addTextFile(file) {
+
+  const text =
+    await readFileAsText(file);
+
+  const page =
+    createPrintPage();
+
+  const div =
+    document.createElement("div");
+
+  div.className =
+    "print-text";
+
+  div.textContent =
+    text;
+
+  page.appendChild(div);
+
+  printArea.appendChild(page);
+
+}
+
+/*
+================================
+ДОБАВИТЬ PDF
+================================
+ВАЖНО:
+браузер не печатает PDF внутри canvas здесь.
+Мы добавляем PDF как iframe-страницу.
+Для точной сборки PDF нужен отдельный PDF.js блок.
+================================
+*/
+
+function addPdfFile(file) {
+
+  const url =
+    URL.createObjectURL(file);
+
+  const page =
+    createPrintPage();
+
+  const frame =
+    document.createElement("iframe");
+
+  frame.src =
+    url;
+
+  frame.style.width =
+    "100%";
+
+  frame.style.height =
+    "260mm";
+
+  frame.style.border =
+    "none";
+
+  page.appendChild(frame);
+
+  printArea.appendChild(page);
+
+}
+
+/*
+================================
+ПОСТРОИТЬ ПРЕДПРОСМОТР
+================================
+*/
+
+async function buildPreview() {
+
+  printArea.innerHTML = "";
+
+  const files =
+    Array.from(fileInput.files || []);
+
+  if (!files.length) {
+    setStatus("ERROR: choose files");
+    return;
+  }
+
+  try {
+
+    for (const file of files) {
+
+      if (file.type.startsWith("image/")) {
+        await addImageFile(file);
+        continue;
+      }
+
+      if (
+        file.type === "text/plain" ||
+        /\.txt$/i.test(file.name)
+      ) {
+        await addTextFile(file);
+        continue;
+      }
+
+      if (
+        file.type === "application/pdf" ||
+        /\.pdf$/i.test(file.name)
+      ) {
+        addPdfFile(file);
+        continue;
+      }
+
+    }
+
+    setStatus(
+      "preview OK: " +
+      files.length +
+      " file(s)"
+    );
+
+  } catch (error) {
+
+    setStatus(
+      "ERROR: " +
+      (error.message || error)
+    );
+
+  }
+
+}
+
+/*
+================================
+ПЕЧАТЬ / СОХРАНЕНИЕ В PDF
+================================
+*/
+
+printBtn.addEventListener("click", () => {
+
+  if (!printArea.children.length) {
+    setStatus("ERROR: build preview first");
+    return;
+  }
+
+  window.print();
+
+});
+
+/*
+================================
+ОБНОВИТЬ РАЗМЕТКУ СТРАНИЦ
+================================
+*/
+
+function refreshExistingPages() {
+
+  const pages =
+    printArea.querySelectorAll(".print-page");
+
+  pages.forEach((page) => {
+    applyPageSettingsToPage(page);
+  });
+
+}
+
+/*
+================================
+СОБЫТИЯ
+================================
+*/
+
+buildBtn.addEventListener(
+  "click",
+  buildPreview
+);
+
+clearBtn.addEventListener("click", () => {
+
+  fileInput.value = "";
+  printArea.innerHTML = "";
+  setStatus("clear OK");
+
+});
+
+pageSize.addEventListener(
+  "change",
+  refreshExistingPages
+);
+
+orientation.addEventListener(
+  "change",
+  refreshExistingPages
+);
+
+marginMm.addEventListener(
+  "input",
+  refreshExistingPages
+);
+
+fitMode.addEventListener(
+  "change",
+  refreshExistingPages
+);
+
+</script>
+
+
+
+
+
 <!--
 ========================================
 КОНСОЛЬ
 ========================================
 -->
 
+<style>
+#service-console {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  padding: 6px 10px;
+  background: #111;
+  color: #8cff8c;
+  font-family: monospace;
+  font-size: 12px;
+  border-top: 1px solid #333;
+  z-index: 9999;
+  opacity: 0.9;
+}
+</style>
+  
+#service-console .row {
+  display: block;
+}
+
 <div id="service-console">
 
   <div class="row" id="build-top">
-    Select fix & button Mosaic  | v5.1.1
+    Start  | v1.0.0
   </div>
 
   <div class="row" id="build-down">
@@ -43,3 +857,7 @@
 
 })();
 </script>
+
+
+</body>
+</html>  
