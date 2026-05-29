@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -31,7 +30,6 @@
   display: block;
 }
 
-  
 /* ========================================
    БАЗА
 ======================================== */
@@ -42,7 +40,7 @@
 
 body {
   margin: 0;
-  padding: 24px;
+  padding: 24px 24px 54px;
   font-family: Arial, sans-serif;
   background: #f4f6f8;
   color: #1e293b;
@@ -93,11 +91,6 @@ h1, h2, h3 {
   background: #fff;
 }
 
-.field.wide {
-  min-width: 320px;
-  flex: 1 1 320px;
-}
-
 button {
   border: none;
   border-radius: 8px;
@@ -123,6 +116,22 @@ button.secondary {
 
 button.secondary:hover {
   background: #334155;
+}
+
+button.google {
+  background: #86efac;
+  color: #14532d;
+}
+
+button.google:hover {
+  background: #4ade80;
+}
+
+.panel-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
 }
 
 /* ========================================
@@ -206,15 +215,21 @@ textarea[dir="rtl"] {
 
 @media (max-width: 900px) {
   body {
-    padding: 14px;
+    padding: 14px 14px 54px;
   }
 
   .container {
     padding: 16px;
   }
+
+  .panel-actions {
+    justify-content: stretch;
+    flex-direction: column;
+  }
 }
 </style>
 </head>
+
 <body>
 
 <div class="container">
@@ -225,118 +240,68 @@ textarea[dir="rtl"] {
 
     <!-- ========================================
          TXT ФАЙЛ
-======================================== -->
+    ======================================== -->
     <div class="field">
       <label for="txtFileInput">TXT file</label>
       <input id="txtFileInput" type="file" accept=".txt,text/plain" />
     </div>
 
     <!-- ========================================
-         ENDPOINT API
-         Сюда можно поставить свой сервер перевода
-======================================== -->
-    <div class="field wide">
-  <label for="apiUrl">API URL</label>
-  <select id="apiUrl">
-  
-  <option value="https://translate.cutie.dating/translate">translate.cutie.dating</option>
-  <option value="https://translate.fedilab.app/translate">translate.fedilab.app</option>
-  <option value="https://translate.foxhaven.cyou/translate">translate.foxhaven.cyou</option>
-  <option value="https://translate.terraprint.co/translate">translate.terraprint.co</option>
-  <option value="https://trans.zillyhuhn.com/translate">trans.zillyhuhn.com</option>
-  <option value="https://lt.psf.lt/translate">lt.psf.lt</option>
-  <option value="https://libretranslate.de/translate">libretranslate.de</option>
-  <option value="https://translate.mentality.rip/translate">translate.mentality.rip</option>
-  <option value="https://translate.astian.org/translate">translate.astian.org</option>
-     
-  <option value="https://libretranslate.com/translate">libretranslate.com</option>
-  <option value="https://translate.argosopentech.com/translate">translate.argosopentech.com</option>
-  <option value="https://translate.api.skitzen.com/translate">translate.api.skitzen.com</option>
-  <option value="https://libretranslate.esmailelbob.xyz/translate">libretranslate.esmailelbob.xyz</option>
-  <option value="https://libretranslate.pussthecat.org/translate">libretranslate.pussthecat.org</option>
-  <option value="https://translate.lotigara.ru/translate">translate.lotigara.ru</option>
-  <option value="https://translate.flossboxin.org.in/translate">translate.flossboxin.org.in</option>
-  <option value="https://libretranslate.eownerdead.dedyn.io/translate">libretranslate.eownerdead.dedyn.io</option>
-
-   </select>
-</div>
-
-    <!-- ========================================
-         API KEY
-         Для некоторых hosted серверов обязателен
-======================================== -->
-    <div class="field">
-      <label for="apiKey">API key</label>
-      <input
-        id="apiKey"
-        type="text"
-        placeholder="optional"
-      />
-    </div>
-
-    <!-- ========================================
          ЯЗЫК ИСТОЧНИКА
-======================================== -->
+    ======================================== -->
     <div class="field">
       <label for="sourceLang">Source</label>
       <select id="sourceLang">
-        <option value="ru" selected>Russian</option>
+        <option value="auto" selected>Auto</option>
+        <option value="ru">Russian</option>
         <option value="he">Hebrew</option>
         <option value="en">English</option>
-        <option value="auto">Auto</option>
+        <option value="es">Spanish</option>
+        <option value="fr">French</option>
+        <option value="uk">Ukrainian</option>
+        <option value="ar">Modern Standard Arabic (MSA)</option>
+        <option value="zh-CN">Modern Standard Chinese (Mandarin)</option>
       </select>
     </div>
 
     <!-- ========================================
          ЯЗЫК ПЕРЕВОДА
-======================================== -->
+    ======================================== -->
     <div class="field">
       <label for="targetLang">Target</label>
       <select id="targetLang">
         <option value="he" selected>Hebrew</option>
         <option value="ru">Russian</option>
         <option value="en">English</option>
+        <option value="es">Spanish</option>
+        <option value="fr">French</option>
+        <option value="uk">Ukrainian</option>
+        <option value="ar">Modern Standard Arabic (MSA)</option>
+        <option value="zh-CN">Modern Standard Chinese (Mandarin)</option>
       </select>
     </div>
 
     <!-- ========================================
-         КНОПКИ
-======================================== -->
+         КНОПКИ ПЕРЕВОДА
+    ======================================== -->
     <div class="field">
       <label>&nbsp;</label>
-      <button id="translateBtn" type="button">Перевести</button>
-    </div>
-
-<div class="field">
-  <label>&nbsp;</label>
-  <button id="googleTranslateBtn" type="button" class="secondary">
-    Google Translate
-  </button>
-</div>
-     
-    <div class="field">
-      <label>&nbsp;</label>
-      <button id="swapBtn" type="button" class="secondary">Поменять</button>
-    </div>
-
-    <div class="field">
-      <label>&nbsp;</label>
-      <button id="downloadSourceBtn" type="button" class="secondary" disabled>
-        Скачать source TXT
+      <button id="translateBtn" type="button">
+        Server Translate
       </button>
     </div>
 
     <div class="field">
       <label>&nbsp;</label>
-      <button id="downloadResultBtn" type="button" class="secondary" disabled>
-        Скачать result TXT
+      <button id="googleTranslateBtn" type="button" class="google">
+        Google Translate
       </button>
     </div>
 
     <div class="field">
       <label>&nbsp;</label>
-      <button id="clearBtn" type="button" class="secondary">
-        Очистить
+      <button id="swapBtn" type="button" class="secondary">
+        ↔ Change
       </button>
     </div>
 
@@ -348,43 +313,64 @@ textarea[dir="rtl"] {
 
     <!-- ========================================
          ИСХОДНЫЙ ТЕКСТ
-======================================== -->
+    ======================================== -->
     <div class="panel">
       <h3>Source text</h3>
 
       <textarea
         id="sourceText"
-        placeholder="Вставь сюда исходный текст или загрузи TXT"
+        placeholder="Paste source text here or upload TXT file"
         dir="auto"
       ></textarea>
 
       <div id="sourceCounter" class="counter"></div>
 
+      <div class="panel-actions">
+        <button id="downloadSourceBtn" type="button" class="secondary" disabled>
+          Save source TXT
+        </button>
+
+        <button id="clearSourceBtn" type="button" class="secondary">
+          Clear source
+        </button>
+      </div>
+
       <div id="sourceInfo" class="info"></div>
 
       <div class="note">
-Поддерживается обычный TXT файл.
-Можно:
-- загрузить TXT
-- вручную вставить текст
-- перевести с русского на иврит
-- сохранить результат обратно в TXT
+Plain TXT file is supported.
+You can:
+- upload TXT
+- paste text manually
+- translate through public servers
+- open text in Google Translate
+- save source and result back to TXT
       </div>
     </div>
 
     <!-- ========================================
          ПЕРЕВОД
-======================================== -->
+    ======================================== -->
     <div class="panel">
       <h3>Translated text</h3>
 
       <textarea
         id="resultText"
-        placeholder="Здесь появится перевод"
+        placeholder="Translation will appear here"
         dir="rtl"
       ></textarea>
 
       <div id="resultCounter" class="counter"></div>
+
+      <div class="panel-actions">
+        <button id="downloadResultBtn" type="button" class="secondary" disabled>
+          Save result TXT
+        </button>
+
+        <button id="clearResultBtn" type="button" class="secondary">
+          Clear result
+        </button>
+      </div>
 
       <div id="resultInfo" class="info"></div>
     </div>
@@ -401,19 +387,18 @@ DOM
 */
 const txtFileInput = document.getElementById("txtFileInput");
 
-const apiUrl = document.getElementById("apiUrl");
-const apiKey = document.getElementById("apiKey");
-
 const sourceLang = document.getElementById("sourceLang");
 const targetLang = document.getElementById("targetLang");
 
 const translateBtn = document.getElementById("translateBtn");
 const googleTranslateBtn = document.getElementById("googleTranslateBtn");
-   
 const swapBtn = document.getElementById("swapBtn");
+
 const downloadSourceBtn = document.getElementById("downloadSourceBtn");
 const downloadResultBtn = document.getElementById("downloadResultBtn");
-const clearBtn = document.getElementById("clearBtn");
+
+const clearSourceBtn = document.getElementById("clearSourceBtn");
+const clearResultBtn = document.getElementById("clearResultBtn");
 
 const statusBox = document.getElementById("status");
 
@@ -425,6 +410,38 @@ const resultCounter = document.getElementById("resultCounter");
 
 const sourceInfo = document.getElementById("sourceInfo");
 const resultInfo = document.getElementById("resultInfo");
+
+/*
+================================
+СЕРВЕРЫ ПЕРЕВОДА
+Select убран.
+Сервер выбирается автоматически.
+================================
+*/
+const TRANSLATE_SERVERS = [
+  
+  "https://translate.fedilab.app/translate"
+
+   /*
+  "https://translate.foxhaven.cyou/translate",
+  "https://translate.terraprint.co/translate",
+  "https://trans.zillyhuhn.com/translate",
+  "https://lt.psf.lt/translate",
+  "https://libretranslate.de/translate",
+  "https://translate.mentality.rip/translate",
+  "https://translate.astian.org/translate",
+  "https://libretranslate.com/translate",
+  "https://translate.argosopentech.com/translate",
+  "https://translate.api.skitzen.com/translate",
+  "https://libretranslate.esmailelbob.xyz/translate",
+  "https://libretranslate.pussthecat.org/translate",
+  "https://translate.lotigara.ru/translate",
+  "https://translate.flossboxin.org.in/translate",
+  "https://libretranslate.eownerdead.dedyn.io/translate",
+  "https://translate.cutie.dating/translate"
+*/
+
+];
 
 /*
 ================================
@@ -520,6 +537,11 @@ function downloadTextAsTxt(text, fileName) {
   }, 1000);
 }
 
+function countLines(text) {
+  if (!text) return 0;
+  return text.split(/\r?\n/).length;
+}
+
 function updateCounters() {
   const sourceValue = sourceText.value || "";
   const resultValue = resultText.value || "";
@@ -533,38 +555,82 @@ function updateCounters() {
     " | Lines: " + countLines(resultValue);
 }
 
-function countLines(text) {
-  if (!text) return 0;
-  return text.split(/\r?\n/).length;
-}
-
 function updateDownloadButtons() {
   downloadSourceBtn.disabled = !sourceText.value.trim();
   downloadResultBtn.disabled = !resultText.value.trim();
 }
 
 function updateResultDirection() {
-  /*
-    Для иврита ставим RTL,
-    для русского и английского — LTR
-  */
-  if (targetLang.value === "he") {
+  if (targetLang.value === "he" || targetLang.value === "ar") {
     resultText.dir = "rtl";
   } else {
     resultText.dir = "ltr";
   }
 }
 
-function clearAll() {
-  txtFileInput.value = "";
-  sourceText.value = "";
-  resultText.value = "";
-  sourceInfo.textContent = "";
-  resultInfo.textContent = "";
-  currentSourceFileName = "source.txt";
-  updateCounters();
-  updateDownloadButtons();
-  clearStatus();
+function getServerLang(lang) {
+  /*
+    Google использует zh-CN.
+    Большинство LibreTranslate серверов используют zh.
+  */
+  if (lang === "zh-CN") return "zh";
+
+  return lang;
+}
+
+async function translateWithServer(endpoint, inputText) {
+  const payload = {
+    q: inputText,
+    source: getServerLang(sourceLang.value),
+    target: getServerLang(targetLang.value),
+    format: "text"
+  };
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+
+    throw new Error(
+      endpoint +
+      " failed: " +
+      response.status +
+      " " +
+      errorText
+    );
+  }
+
+  const data = await response.json();
+
+  if (!data || typeof data.translatedText !== "string") {
+    throw new Error(endpoint + " failed: translatedText not found");
+  }
+
+  return data.translatedText;
+}
+
+function getServerList() {
+  /*
+    Сначала пробуем последний рабочий сервер.
+    Потом остальные.
+  */
+  const lastGoodServer =
+    localStorage.getItem("lastGoodTranslateServer");
+
+  if (!lastGoodServer) {
+    return TRANSLATE_SERVERS;
+  }
+
+  return [
+    lastGoodServer,
+    ...TRANSLATE_SERVERS.filter(server => server !== lastGoodServer)
+  ];
 }
 
 /*
@@ -626,13 +692,20 @@ targetLang.addEventListener("change", () => {
 
 /*
 ================================
-ПОМЕНЯТЬ ЯЗЫКИ И ТЕКСТЫ МЕСТАМИ
+CHANGE
+Поменять языки и тексты местами
 ================================
 */
 swapBtn.addEventListener("click", () => {
   const oldSourceLang = sourceLang.value;
-  sourceLang.value = targetLang.value;
-  targetLang.value = oldSourceLang;
+
+  if (targetLang.value !== "auto") {
+    sourceLang.value = targetLang.value;
+  }
+
+  if (oldSourceLang !== "auto") {
+    targetLang.value = oldSourceLang;
+  }
 
   const oldSourceText = sourceText.value;
   sourceText.value = resultText.value;
@@ -642,91 +715,68 @@ swapBtn.addEventListener("click", () => {
   updateCounters();
   updateDownloadButtons();
 
-  setStatus("swap OK");
+  setStatus("change OK");
 });
 
 /*
 ================================
-ПЕРЕВОД
+SERVER TRANSLATE
+Автоматически перебирает серверы
 ================================
 */
 translateBtn.addEventListener("click", async () => {
   clearStatus();
 
   const inputText = sourceText.value.trim();
-  const endpoint = apiUrl.value.trim();
-  const key = apiKey.value.trim();
 
   if (!inputText) {
     setStatus("ERROR: source text is empty");
     return;
   }
 
-  if (!endpoint) {
-    setStatus("ERROR: API URL is empty");
-    return;
-  }
-
   try {
     translateBtn.disabled = true;
     resultInfo.textContent = "";
+    resultText.value = "";
 
-    /*
-      Формируем тело запроса под LibreTranslate API
-    */
-    const payload = {
-      q: inputText,
-      source: sourceLang.value,
-      target: targetLang.value,
-      format: "text"
-    };
+    const servers = getServerList();
+    const errors = [];
 
-    /*
-      API key добавляем только если он реально задан
-    */
-    if (key) {
-      payload.api_key = key;
+    for (const server of servers) {
+      try {
+        setStatus("Trying server:\n" + server);
+
+        const translatedText =
+          await translateWithServer(server, inputText);
+
+        resultText.value = translatedText;
+
+        localStorage.setItem(
+          "lastGoodTranslateServer",
+          server
+        );
+
+        resultInfo.textContent =
+          "Server: " + server + "\n" +
+          "Source lang: " + sourceLang.value + "\n" +
+          "Target lang: " + targetLang.value + "\n" +
+          "Result length: " + resultText.value.length + " chars";
+
+        updateResultDirection();
+        updateCounters();
+        updateDownloadButtons();
+
+        setStatus("server translate OK\n" + server);
+        return;
+      } catch (error) {
+        errors.push(error.message || String(error));
+      }
     }
 
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(
-        "translation request failed: " +
-        response.status +
-        " " +
-        errorText
-      );
-    }
-
-    const data = await response.json();
-
-    /*
-      Ожидаем поле translatedText
-    */
-    if (!data || typeof data.translatedText !== "string") {
-      throw new Error("translatedText not found in response");
-    }
-
-    resultText.value = data.translatedText;
-
-    resultInfo.textContent =
-      "Source lang: " + sourceLang.value + "\n" +
-      "Target lang: " + targetLang.value + "\n" +
-      "Result length: " + resultText.value.length + " chars";
-
-    updateResultDirection();
-    updateCounters();
-    updateDownloadButtons();
-
-    setStatus("translate OK");
+    throw new Error(
+      "all translate servers failed\n\n" +
+      errors.slice(0, 5).join("\n\n")
+    );
   } catch (error) {
     setStatus("ERROR: " + (error.message || error));
   } finally {
@@ -751,12 +801,9 @@ googleTranslateBtn.addEventListener("click", () => {
     return;
   }
 
-  const target =
-    targetLang.value || "ru";
-
   const url =
     "https://translate.google.com/?sl=auto&tl=" +
-    encodeURIComponent(target) +
+    encodeURIComponent(targetLang.value) +
     "&text=" +
     encodeURIComponent(inputText) +
     "&op=translate";
@@ -765,10 +812,10 @@ googleTranslateBtn.addEventListener("click", () => {
 
   setStatus("Google Translate opened OK");
 });
-   
+
 /*
 ================================
-СКАЧАТЬ SOURCE TXT
+SAVE SOURCE TXT
 ================================
 */
 downloadSourceBtn.addEventListener("click", () => {
@@ -787,7 +834,7 @@ downloadSourceBtn.addEventListener("click", () => {
 
 /*
 ================================
-СКАЧАТЬ RESULT TXT
+SAVE RESULT TXT
 ================================
 */
 downloadResultBtn.addEventListener("click", () => {
@@ -799,18 +846,44 @@ downloadResultBtn.addEventListener("click", () => {
   }
 
   const baseName = getBaseName(currentSourceFileName);
-  downloadTextAsTxt(text, baseName + "_translated_" + targetLang.value + ".txt");
+  downloadTextAsTxt(
+    text,
+    baseName + "_translated_" + targetLang.value + ".txt"
+  );
 
   setStatus("save result TXT OK");
 });
 
 /*
 ================================
-ОЧИСТИТЬ
+CLEAR SOURCE
 ================================
 */
-clearBtn.addEventListener("click", () => {
-  clearAll();
+clearSourceBtn.addEventListener("click", () => {
+  txtFileInput.value = "";
+  sourceText.value = "";
+  sourceInfo.textContent = "";
+  currentSourceFileName = "source.txt";
+
+  updateCounters();
+  updateDownloadButtons();
+
+  setStatus("clear source OK");
+});
+
+/*
+================================
+CLEAR RESULT
+================================
+*/
+clearResultBtn.addEventListener("click", () => {
+  resultText.value = "";
+  resultInfo.textContent = "";
+
+  updateCounters();
+  updateDownloadButtons();
+
+  setStatus("clear result OK");
 });
 
 /*
@@ -823,20 +896,14 @@ updateDownloadButtons();
 updateResultDirection();
 </script>
 
-
-
 <!-- ========================================
      SERVICE CONSOLE
-     Верхняя строка редактируется вручную
-     Здесь задается:
-     - название страницы
-     - номер версии
 ======================================== -->
 
 <div id="service-console">
 
   <div class="row" id="build-top">
-selector + google translate  | v1.0.4
+auto server fedilab + google translate | v1.0.5
   </div>
 
   <div class="row" id="build-down">
@@ -844,14 +911,6 @@ selector + google translate  | v1.0.4
   </div>
 
 </div>
-
-<!-- ========================================
-     SCRIPT
-     Автоматически выводит:
-     - дату
-     - время
-     Момент загрузки страницы
-======================================== -->
 
 <script>
 (function () {
@@ -875,14 +934,9 @@ selector + google translate  | v1.0.4
   document
     .getElementById("build-down")
     .textContent =
-      "deploy: "
-      + date
-      + " "
-      + time;
+      "deploy: " + date + " " + time;
 })();
 </script>
 
-
-     
 </body>
 </html>
