@@ -307,6 +307,13 @@ textarea[dir="rtl"] {
       <button id="translateBtn" type="button">Перевести</button>
     </div>
 
+<div class="field">
+  <label>&nbsp;</label>
+  <button id="googleTranslateBtn" type="button" class="secondary">
+    Google Translate
+  </button>
+</div>
+     
     <div class="field">
       <label>&nbsp;</label>
       <button id="swapBtn" type="button" class="secondary">Поменять</button>
@@ -401,6 +408,8 @@ const sourceLang = document.getElementById("sourceLang");
 const targetLang = document.getElementById("targetLang");
 
 const translateBtn = document.getElementById("translateBtn");
+const googleTranslateBtn = document.getElementById("googleTranslateBtn");
+   
 const swapBtn = document.getElementById("swapBtn");
 const downloadSourceBtn = document.getElementById("downloadSourceBtn");
 const downloadResultBtn = document.getElementById("downloadResultBtn");
@@ -727,6 +736,38 @@ translateBtn.addEventListener("click", async () => {
 
 /*
 ================================
+GOOGLE TRANSLATE
+Открывает Google Translate
+и автоматически подставляет текст
+================================
+*/
+googleTranslateBtn.addEventListener("click", () => {
+  clearStatus();
+
+  const inputText = sourceText.value.trim();
+
+  if (!inputText) {
+    setStatus("ERROR: source text is empty");
+    return;
+  }
+
+  const target =
+    targetLang.value || "ru";
+
+  const url =
+    "https://translate.google.com/?sl=auto&tl=" +
+    encodeURIComponent(target) +
+    "&text=" +
+    encodeURIComponent(inputText) +
+    "&op=translate";
+
+  window.open(url, "_blank");
+
+  setStatus("Google Translate opened OK");
+});
+   
+/*
+================================
 СКАЧАТЬ SOURCE TXT
 ================================
 */
@@ -795,7 +836,7 @@ updateResultDirection();
 <div id="service-console">
 
   <div class="row" id="build-top">
-selector + 8 servers  | v1.0.3
+selector + google translate  | v1.0.4
   </div>
 
   <div class="row" id="build-down">
@@ -841,8 +882,7 @@ selector + 8 servers  | v1.0.3
 })();
 </script>
 
-  </body>
-</html>
+
      
 </body>
 </html>
