@@ -472,7 +472,12 @@ The image is fitted into the page with selected margins and orientation.
       <div class="center-tools">
         <div class="tool-wrap" data-tip-wrap>
           <button id="undoBtn" type="button" disabled>Undo</button>
-          <div class="tool-tip">Undo one editing step.</div>
+          <div class="tool-tip">Undo one source step.</div>
+        </div>
+
+        <div class="tool-wrap" data-tip-wrap>
+          <button id="redoBtn" type="button" disabled>Redo</button>
+          <div class="tool-tip">Redo one source step.</div>
         </div>
       </div>
 
@@ -650,6 +655,12 @@ let activeMode = null;
 const editHistory = [];
 
 /*
+  ИСТОРИЯ REDO
+  Сюда кладём состояние, отменённое через Undo.
+*/
+const redoHistory = [];
+
+/*
   СОСТОЯНИЕ CROP
 */
 let cropRect = null;
@@ -727,6 +738,7 @@ const colorModeBtn = document.getElementById("colorModeBtn");
 
 const backToOriginalBtn = document.getElementById("backToOriginalBtn");
 const undoBtn = document.getElementById("undoBtn");
+const redoBtn = document.getElementById("redoBtn");
 const applyBtn = document.getElementById("applyBtn");
 const useAsSourceBtn = document.getElementById("useAsSourceBtn");
 const makeAvatarBtn = document.getElementById("makeAvatarBtn");
@@ -799,6 +811,10 @@ document.addEventListener("click", () => {
 outputFormat.addEventListener("change", updateFormatUI);
 
 function updateFormatUI() {
+  /*
+    Format влияет только на Save to disk.
+    Editor и Result не пересобираются при смене формата.
+  */
   pdfPanel.classList.toggle("visible", outputFormat.value === "pdf");
 }
 
@@ -1126,17 +1142,62 @@ undoBtn.addEventListener("click", async () => {
   try {
     clearStatus();
 
+    /*
+      Undo работает только с Editor-source.
+      Result сбрасываем, потому что он уже не соответствует Editor.
+    */
+    redoHistory.push(sourceFile);
+
     const previousFile = editHistory.pop();
     sourceFile = previousFile;
 
     await loadSourceFileIntoEditor(sourceFile);
+    resetResult();
     resetAllEditingState();
     activeMode = null;
     updateModeUI();
     drawEditor();
     updateHistoryButtons();
 
-    setStatus("Undo one step OK");
+    setStatus("Undo one source step OK");
+  } catch (error) {
+    setStatus("ERROR" + error.message);
+  }
+});
+
+/*
+================================
+ПОВТОРИТЬ ПРАВКУ
+================================
+*/
+
+redoBtn.addEventListener("click", async () => {
+  if (redoHistory.length === 0) {
+    setStatus("there is no next edit");
+    return;
+  }
+
+  try {
+    clearStatus();
+
+    /*
+      Redo возвращает Editor-source, отменённый через Undo.
+      Result также сбрасываем.
+    */
+    editHistory.push(sourceFile);
+
+    const nextFile = redoHistory.pop();
+    sourceFile = nextFile;
+
+    await loadSourceFileIntoEditor(sourceFile);
+    resetResult();
+    resetAllEditingState();
+    activeMode = null;
+    updateModeUI();
+    drawEditor();
+    updateHistoryButtons();
+
+    setStatus("Redo one source step OK");
   } catch (error) {
     setStatus("ERROR" + error.message);
   }
@@ -1310,15 +1371,26 @@ document
 */
 
 function pushHistory(file) {
+  if (!file) return;
+
   editHistory.push(file);
+
+  /*
+    Любое новое действие после Undo ломает старую ветку Redo.
+  */
+  redoHistory.length = 0;
+
+  updateHistoryButtons();
 }
 
 function clearHistory() {
   editHistory.length = 0;
+  redoHistory.length = 0;
 }
 
 function updateHistoryButtons() {
   undoBtn.disabled = editHistory.length === 0;
+  redoBtn.disabled = redoHistory.length === 0;
   backToOriginalBtn.disabled = !originalFile;
 }
 
@@ -2222,6 +2294,10 @@ async function buildPdfBlobFromImageFile(file) {
   const dataUrl = await readFileAsDataURL(file);
   const image = await loadImage(dataUrl);
 
+  /*
+    Это временный canvas только для упаковки изображения в PDF.
+    Он не связан с Editor canvas и не меняет Result.
+  */
   const canvas = document.createElement("canvas");
   canvas.width = image.width;
   canvas.height = image.height;
@@ -2478,7 +2554,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-editor result logic | v2.4.0
+canvas & undo\redo fix | v2.4.1
   </div>
 
   <div class="row" id="build-down">
