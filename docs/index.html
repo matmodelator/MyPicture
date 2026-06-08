@@ -1847,11 +1847,10 @@ async function showResult(file) {
     : "0";
 
   resultInfo.textContent =
-    "Name: " + file.name + "\n" +
-    "Type: " + file.type + "\n" +
-    "Size: " + formatSize(file.size) + "\n" +
-    "Resolution: " + meta.width + " × " + meta.height + "\n" +
-    "Saved: " + savedPercent + "%";
+    "File name: " + file.name + "\n" +
+  "Format: " + file.name.split(".").pop().toUpperCase() + "\n" +
+  "File size: " + formatSize(file.size) + "\n" +
+  "Image size: " + meta.width + " × " + meta.height + " px";
 }
 
 /*
@@ -2504,7 +2503,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-original file Info| v2.3.1
+result file Info| v2.3.2
   </div>
 
   <div class="row" id="build-down">
