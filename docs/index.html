@@ -1376,11 +1376,10 @@ async function loadSourceFileIntoEditor(file) {
   editCanvas.style.display = "block";
 
   originalInfo.textContent =
-    "Name: " + file.name + "\n" +
-    "Type: " + file.type + "\n" +
-    "Size: " + formatSize(file.size) + "\n" +
-    "Resolution: " + img.width + " × " + img.height + "\n" +
-    "Canvas: " + editCanvas.width + " × " + editCanvas.height;
+  "File name: " + file.name + "\n" +
+  "Format: " + file.name.split(".").pop().toUpperCase() + "\n" +
+  "File size: " + formatSize(file.size) + "\n" +
+  "Image size: " + img.width + " × " + img.height + " px";
 }
 
 /*
@@ -2505,7 +2504,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-zoom \ resize | v2.3.0
+original file Info| v2.3.1
   </div>
 
   <div class="row" id="build-down">
