@@ -658,6 +658,7 @@ let activeMode = null;
     */
      
 const editHistory = [];
+let historyIndex = 0;
    
 /*
   СОСТОЯНИЕ CROP
@@ -850,6 +851,12 @@ photoInput.addEventListener("change", async (event) => {
     sourceFile =
       file;
 
+editHistory.length = 0;
+
+editHistory.push(file);
+
+historyIndex = 0;
+     
     await loadSourceFileIntoEditor(
       sourceFile
     );
@@ -1043,11 +1050,6 @@ applyBtn.addEventListener("click", async () => {
   try {
     clearStatus();
 
-    /*
-      Apply по новой логике:
-      Editor остаётся рабочей областью.
-      Result обновляется справа и НЕ становится source автоматически.
-    */
     processedFile = await buildFinalFile(sourceFile, {
       useCrop: activeMode === "crop" && !!cropRect,
       cropRectCanvas: cropRect,
@@ -1064,41 +1066,40 @@ applyBtn.addEventListener("click", async () => {
       quality: Number(qualityInput.value) || 0.75
     });
 
-    
-await showResult(processedFile);
+    await showResult(processedFile);
 
-/*
-  Apply принимает результат:
-  - старый Editor кладём в Undo;
-  - Result становится новым Editor;
-  - справа Result остаётся для сравнения.
-*/
+    sourceFile =
+      processedFile;
 
-pushHistory(sourceFile);
+    pushHistory(sourceFile);
 
-sourceFile =
-  processedFile;
+    await loadSourceFileIntoEditor(
+      sourceFile
+    );
 
-await loadSourceFileIntoEditor(
-  sourceFile
-);
+    resetAllEditingState();
 
-resetAllEditingState();
+    activeMode =
+      null;
 
-activeMode =
-  null;
+    updateModeUI();
 
-updateModeUI();
+    drawEditor();
 
-drawEditor();
+    updateHistoryButtons();
 
-updateHistoryButtons();
+    useAsSourceBtn.disabled =
+      false;
 
-useAsSourceBtn.disabled =
-  false;
+    setStatus("Result is ready OK");
 
-setStatus("Result is ready OK");
-
+  } catch (error) {
+    setStatus(
+      "ERROR " +
+      (error.message || error)
+    );
+  }
+});
    
 /*
 ================================
@@ -1115,26 +1116,35 @@ useAsSourceBtn.addEventListener("click", async () => {
   try {
     clearStatus();
 
-    /*
-      Use as source:
-      переносит Result обратно в Editor.
-      Только здесь Result становится новым рабочим изображением.
-    */
-    pushHistory(sourceFile);
+    sourceFile =
+      processedFile;
 
-    sourceFile = processedFile;
-    await loadSourceFileIntoEditor(sourceFile);
+    pushHistory(
+      sourceFile
+    );
 
-    resetResult();
+    await loadSourceFileIntoEditor(
+      sourceFile
+    );
+
     resetAllEditingState();
-    activeMode = null;
+
+    activeMode =
+      null;
+
     updateModeUI();
+
     drawEditor();
+
     updateHistoryButtons();
 
     setStatus("Result loaded as source OK");
+
   } catch (error) {
-    setStatus("ERROR" + error.message);
+    setStatus(
+      "ERROR " +
+      (error.message || error)
+    );
   }
 });
 
@@ -1192,63 +1202,98 @@ makeAvatarBtn.addEventListener("click", async () => {
 });
 
 /*
+/*
 ================================
 ОТМЕНИТЬ ПРАВКУ UNDO
 ================================
 */
 
-undoBtn.addEventListener(
-  "click",
-  async () => {
+undoBtn.addEventListener("click", async () => {
+  if (historyIndex <= 0)
+    return;
 
-    if (applyIndex <= 0)
-      return;
+  try {
+    clearStatus();
 
-    applyIndex--;
+    historyIndex--;
 
     sourceFile =
-      applyHistory[applyIndex];
+      editHistory[historyIndex];
 
     await loadSourceFileIntoEditor(
       sourceFile
     );
 
+    resetAllEditingState();
+
+    activeMode =
+      null;
+
+    updateModeUI();
+
+    drawEditor();
+
+    updateHistoryButtons();
+
     setStatus(
-      "Undo Apply OK"
+      "Undo OK"
+    );
+
+  } catch (error) {
+    setStatus(
+      "ERROR " +
+      (error.message || error)
     );
   }
-);
+});
 
 /*
 ================================
 ВЕРНУТЬ ПРАВКУ REDO
 ================================
 */
-   
-redoBtn.addEventListener(
-  "click",
-  async () => {
 
-    if (
-      applyIndex >=
-      applyHistory.length - 1
-    )
-      return;
+redoBtn.addEventListener("click", async () => {
+  if (
+    historyIndex >=
+    editHistory.length - 1
+  )
+    return;
 
-    applyIndex++;
+  try {
+    clearStatus();
+
+    historyIndex++;
 
     sourceFile =
-      applyHistory[applyIndex];
+      editHistory[historyIndex];
 
     await loadSourceFileIntoEditor(
       sourceFile
     );
 
+    resetAllEditingState();
+
+    activeMode =
+      null;
+
+    updateModeUI();
+
+    drawEditor();
+
+    updateHistoryButtons();
+
     setStatus(
-      "Redo Apply OK"
+      "Redo OK"
+    );
+
+  } catch (error) {
+    setStatus(
+      "ERROR " +
+      (error.message || error)
     );
   }
-);
+});
    
 /*
 ================================
@@ -1418,25 +1463,42 @@ document
 */
 
 function pushHistory(file) {
+  if (!file)
+    return;
+
+  /*
+    Если после Undo сделали новый Apply,
+    отрезаем всё, что было впереди.
+  */
+  editHistory.splice(historyIndex + 1);
+
   editHistory.push(file);
+
+  historyIndex =
+    editHistory.length - 1;
+
+  updateHistoryButtons();
 }
 
 function clearHistory() {
   editHistory.length = 0;
+
+  historyIndex = 0;
+
+  updateHistoryButtons();
 }
 
 function updateHistoryButtons() {
   undoBtn.disabled =
-    applyIndex <= 0;
+    historyIndex <= 0;
 
   redoBtn.disabled =
-    applyIndex < 0 ||
-    applyIndex >= applyHistory.length - 1;
+    historyIndex >= editHistory.length - 1;
 
   backToOriginalBtn.disabled =
     !originalFile;
 }
-
+   
 /*
 ================================
 ЗАГРУЗИТЬ ФАЙЛ В EDITOR
@@ -2589,7 +2651,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-UNDO\REDO | v3.1.0
+Apply\Edit cleaning | v3.2.0
   </div>
 
   <div class="row" id="build-down">
