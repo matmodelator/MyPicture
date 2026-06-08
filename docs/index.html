@@ -90,6 +90,20 @@ h2, h3 {
   min-width: 130px;
 }
 
+/* Поле выбора размера теперь в одну строку */
+.size-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 280px;
+}
+
+.size-inline-label {
+  font-size: 14px;
+  color: #333;
+  white-space: nowrap;
+}
+
 
 /* ========================================
    ПАНЕЛЬ КНОПОК
@@ -352,6 +366,10 @@ button.active {
   .right-tools {
     justify-content: flex-start;
   }
+
+  .size-inline {
+    min-width: 240px;
+  }
 }
 </style>
 </head>
@@ -454,12 +472,12 @@ The image is fitted into the page with selected margins and orientation.
       <div class="center-tools">
         <div class="tool-wrap" data-tip-wrap>
           <button id="undoBtn" type="button" disabled>Undo</button>
-          <div class="tool-tip">Undo one source step.</div>
+          <div class="tool-tip">Go to previous Apply result.</div>
         </div>
 
         <div class="tool-wrap" data-tip-wrap>
           <button id="redoBtn" type="button" disabled>Redo</button>
-          <div class="tool-tip">Redo one source step.</div>
+          <div class="tool-tip">Go to next Apply result.</div>
         </div>
       </div>
 
@@ -577,7 +595,7 @@ Resize: set final Width and Height, with or without aspect ratio.
 Color: activate the button and adjust sliders.
 Apply: builds Result from the current Editor settings.
 Use as source: loads Result back into Editor.
-Avatar: creates a round avatar from the current image.
+Avatar: creates a round avatar and also loads it back into the editor.
 Format: affects Save to disk.
     </div>
   </div>
@@ -631,16 +649,12 @@ let imageNaturalHeight = 0;
 let activeMode = null;
 
 /*
-  ИСТОРИЯ ПРАВОК
-  Сюда кладём предыдущее состояние перед Apply / Avatar
+  ИСТОРИЯ APPLY
+  Undo / Redo работают только по готовым Result,
+  то есть между последовательными нажатиями Apply.
 */
-const editHistory = [];
-
-/*
-  ИСТОРИЯ REDO
-  Сюда кладём состояние, отменённое через Undo.
-*/
-const redoHistory = [];
+const applyHistory = [];
+let applyHistoryIndex = -1;
 
 /*
   СОСТОЯНИЕ CROP
@@ -793,10 +807,6 @@ document.addEventListener("click", () => {
 outputFormat.addEventListener("change", updateFormatUI);
 
 function updateFormatUI() {
-  /*
-    Format влияет только на Save to disk.
-    Editor и Result при смене формата не пересобираются.
-  */
   pdfPanel.classList.toggle("visible", outputFormat.value === "pdf");
 }
 
@@ -989,9 +999,10 @@ applyBtn.addEventListener("click", async () => {
     clearStatus();
 
     /*
-      Apply по новой логике:
-      Editor остаётся рабочей областью.
-      Result обновляется справа и НЕ становится source автоматически.
+      Apply:
+      строит новый Result из текущего Editor.
+      Editor не меняется.
+      Каждый Apply добавляется в историю Result.
     */
     processedFile = await buildFinalFile(sourceFile, {
       useCrop: activeMode === "crop" && !!cropRect,
@@ -1001,6 +1012,7 @@ applyBtn.addEventListener("click", async () => {
       imageWidth: imageNaturalWidth,
       imageHeight: imageNaturalHeight,
       useZoom: activeMode === "zoom" || resizeView.zoom > 1 || !isResizeDefault(),
+      resizeView,
       useOutputResize: activeMode === "resize",
       targetWidth: Number(resizeWidth.value),
       targetHeight: Number(resizeHeight.value),
@@ -1008,8 +1020,11 @@ applyBtn.addEventListener("click", async () => {
       quality: Number(qualityInput.value) || 0.75
     });
 
+    pushApplyHistory(processedFile);
+
     await showResult(processedFile);
     useAsSourceBtn.disabled = false;
+    updateHistoryButtons();
 
     setStatus("Result is ready OK");
   } catch (error) {
@@ -1033,15 +1048,19 @@ useAsSourceBtn.addEventListener("click", async () => {
     clearStatus();
 
     /*
-      Use as source — единственное место, где Result становится новым Editor-source.
+      Use as source:
+      переносит Result обратно в Editor.
+      Только здесь Result становится новым рабочим изображением.
     */
-    setEditorSource(processedFile, true);
+    sourceFile = processedFile;
+    await loadSourceFileIntoEditor(sourceFile);
 
     resetResult();
     resetAllEditingState();
     activeMode = null;
     updateModeUI();
     drawEditor();
+    updateHistoryButtons();
 
     setStatus("Result loaded as source OK");
   } catch (error) {
@@ -1065,9 +1084,10 @@ makeAvatarBtn.addEventListener("click", async () => {
     clearStatus();
 
     /*
-      Avatar по новой логике:
-      создаёт Result, но не перезаписывает Editor автоматически.
-      Для переноса в Editor используется Use as source.
+      Для аватара:
+      1) если активен Crop и есть выделение — берём его
+      2) иначе берём квадрат по центру
+      3) накладываем круглую маску
     */
     processedFile = await buildAvatarFile(sourceFile, {
       cropRectCanvas: (activeMode === "crop" && cropRect) ? cropRect : null,
@@ -1081,9 +1101,17 @@ makeAvatarBtn.addEventListener("click", async () => {
     });
 
     await showResult(processedFile);
-    useAsSourceBtn.disabled = false;
 
-    setStatus("Avatar Result is ready OK");
+    sourceFile = processedFile;
+    await loadSourceFileIntoEditor(sourceFile);
+
+    resetAllEditingState();
+    activeMode = null;
+    updateModeUI();
+    drawEditor();
+    updateHistoryButtons();
+
+    setStatus("Avatar is done OK");
   } catch (error) {
     setStatus("ERROR" + error.message);
   }
@@ -1096,8 +1124,8 @@ makeAvatarBtn.addEventListener("click", async () => {
 */
 
 undoBtn.addEventListener("click", async () => {
-  if (editHistory.length === 0) {
-    setStatus("there is no previous edit");
+  if (applyHistoryIndex <= 0) {
+    setStatus("there is no previous Apply result");
     return;
   }
 
@@ -1105,22 +1133,19 @@ undoBtn.addEventListener("click", async () => {
     clearStatus();
 
     /*
-      Undo работает только с Editor-source.
-      Result сбрасываем, потому что он уже не соответствует Editor.
+      Undo:
+      переходит к предыдущему Result,
+      созданному через Apply.
+      Editor при этом не меняется.
     */
-    redoHistory.push(sourceFile);
+    applyHistoryIndex -= 1;
+    processedFile = applyHistory[applyHistoryIndex];
 
-    const previousFile = editHistory.pop();
-    await setEditorSource(previousFile, false);
-
-    resetResult();
-    resetAllEditingState();
-    activeMode = null;
-    updateModeUI();
-    drawEditor();
+    await showResult(processedFile);
+    useAsSourceBtn.disabled = false;
     updateHistoryButtons();
 
-    setStatus("Undo one source step OK");
+    setStatus("Previous Apply result OK");
   } catch (error) {
     setStatus("ERROR" + error.message);
   }
@@ -1128,13 +1153,13 @@ undoBtn.addEventListener("click", async () => {
 
 /*
 ================================
-ПОВТОРИТЬ ПРАВКУ
+ПОВТОРИТЬ APPLY RESULT
 ================================
 */
 
 redoBtn.addEventListener("click", async () => {
-  if (redoHistory.length === 0) {
-    setStatus("there is no next edit");
+  if (applyHistoryIndex >= applyHistory.length - 1) {
+    setStatus("there is no next Apply result");
     return;
   }
 
@@ -1142,22 +1167,19 @@ redoBtn.addEventListener("click", async () => {
     clearStatus();
 
     /*
-      Redo возвращает Editor-source, отменённый через Undo.
-      Result также сбрасываем.
+      Redo:
+      переходит к следующему Result,
+      созданному через Apply.
+      Editor при этом не меняется.
     */
-    editHistory.push(sourceFile);
+    applyHistoryIndex += 1;
+    processedFile = applyHistory[applyHistoryIndex];
 
-    const nextFile = redoHistory.pop();
-    await setEditorSource(nextFile, false);
-
-    resetResult();
-    resetAllEditingState();
-    activeMode = null;
-    updateModeUI();
-    drawEditor();
+    await showResult(processedFile);
+    useAsSourceBtn.disabled = false;
     updateHistoryButtons();
 
-    setStatus("Redo one source step OK");
+    setStatus("Next Apply result OK");
   } catch (error) {
     setStatus("ERROR" + error.message);
   }
@@ -1178,10 +1200,11 @@ backToOriginalBtn.addEventListener("click", async () => {
   try {
     clearStatus();
 
+    sourceFile = originalFile;
     clearHistory();
-    await setEditorSource(originalFile, false);
-
     resetResult();
+
+    await loadSourceFileIntoEditor(sourceFile);
     resetAllEditingState();
     activeMode = null;
     updateModeUI();
@@ -1205,7 +1228,7 @@ document
   .addEventListener("click", async () => {
 
     /*
-      Save to disk сохраняет только Result.
+      По новой логике Save сохраняет только Result.
       Если Result ещё не создан — просим нажать Apply.
     */
     if (!processedFile) {
@@ -1228,7 +1251,7 @@ document
 
       /*
         SVG
-        Это SVG-контейнер со встроенной картинкой.
+        Это SVG-контейнер со встроенной картинкой
       */
       if (format === "svg") {
         const svgFile = await buildSvgFileFromImageFile(exportFile);
@@ -1330,46 +1353,31 @@ document
 ================================
 */
 
-function pushHistory(file) {
+function pushApplyHistory(file) {
   if (!file) return;
 
-  editHistory.push(file);
-
   /*
-    Любое новое действие после Undo ломает старую ветку Redo.
+    Если после Undo нажали Apply,
+    все будущие Redo-результаты отбрасываются.
   */
-  redoHistory.length = 0;
+  applyHistory.splice(applyHistoryIndex + 1);
 
-  updateHistoryButtons();
+  applyHistory.push(file);
+  applyHistoryIndex = applyHistory.length - 1;
 }
 
 function clearHistory() {
-  editHistory.length = 0;
-  redoHistory.length = 0;
+  applyHistory.length = 0;
+  applyHistoryIndex = -1;
 }
 
 function updateHistoryButtons() {
-  undoBtn.disabled = editHistory.length === 0;
-  redoBtn.disabled = redoHistory.length === 0;
+  undoBtn.disabled = applyHistoryIndex <= 0;
+  redoBtn.disabled =
+    applyHistoryIndex < 0 ||
+    applyHistoryIndex >= applyHistory.length - 1;
+
   backToOriginalBtn.disabled = !originalFile;
-}
-
-/*
-================================
-УСТАНОВИТЬ SOURCE ДЛЯ EDITOR
-================================
-*/
-
-async function setEditorSource(file, addToUndo) {
-  if (!file) return;
-
-  if (addToUndo && sourceFile) {
-    pushHistory(sourceFile);
-  }
-
-  sourceFile = file;
-  await loadSourceFileIntoEditor(sourceFile);
-  updateHistoryButtons();
 }
 
 /*
@@ -2272,10 +2280,6 @@ async function buildPdfBlobFromImageFile(file) {
   const dataUrl = await readFileAsDataURL(file);
   const image = await loadImage(dataUrl);
 
-  /*
-    Это временный canvas только для упаковки изображения в PDF.
-    Он не связан с Editor canvas и не меняет Result.
-  */
   const canvas = document.createElement("canvas");
   canvas.width = image.width;
   canvas.height = image.height;
@@ -2532,7 +2536,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-state model new | v2.5.0
+canvas apply history undo redo | v2.6.0
   </div>
 
   <div class="row" id="build-down">
