@@ -90,20 +90,6 @@ h2, h3 {
   min-width: 130px;
 }
 
-/* Поле выбора размера теперь в одну строку */
-.size-inline {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 280px;
-}
-
-.size-inline-label {
-  font-size: 14px;
-  color: #333;
-  white-space: nowrap;
-}
-
 
 /* ========================================
    ПАНЕЛЬ КНОПОК
@@ -366,10 +352,6 @@ button.active {
   .right-tools {
     justify-content: flex-start;
   }
-
-  .size-inline {
-    min-width: 240px;
-  }
 }
 </style>
 </head>
@@ -595,7 +577,7 @@ Resize: set final Width and Height, with or without aspect ratio.
 Color: activate the button and adjust sliders.
 Apply: builds Result from the current Editor settings.
 Use as source: loads Result back into Editor.
-Avatar: creates a round avatar and also loads it back into the editor.
+Avatar: creates a round avatar from the current image.
 Format: affects Save to disk.
     </div>
   </div>
@@ -813,7 +795,7 @@ outputFormat.addEventListener("change", updateFormatUI);
 function updateFormatUI() {
   /*
     Format влияет только на Save to disk.
-    Editor и Result не пересобираются при смене формата.
+    Editor и Result при смене формата не пересобираются.
   */
   pdfPanel.classList.toggle("visible", outputFormat.value === "pdf");
 }
@@ -1019,7 +1001,6 @@ applyBtn.addEventListener("click", async () => {
       imageWidth: imageNaturalWidth,
       imageHeight: imageNaturalHeight,
       useZoom: activeMode === "zoom" || resizeView.zoom > 1 || !isResizeDefault(),
-      resizeView,
       useOutputResize: activeMode === "resize",
       targetWidth: Number(resizeWidth.value),
       targetHeight: Number(resizeHeight.value),
@@ -1052,21 +1033,15 @@ useAsSourceBtn.addEventListener("click", async () => {
     clearStatus();
 
     /*
-      Use as source:
-      переносит Result обратно в Editor.
-      Только здесь Result становится новым рабочим изображением.
+      Use as source — единственное место, где Result становится новым Editor-source.
     */
-    pushHistory(sourceFile);
-
-    sourceFile = processedFile;
-    await loadSourceFileIntoEditor(sourceFile);
+    setEditorSource(processedFile, true);
 
     resetResult();
     resetAllEditingState();
     activeMode = null;
     updateModeUI();
     drawEditor();
-    updateHistoryButtons();
 
     setStatus("Result loaded as source OK");
   } catch (error) {
@@ -1089,13 +1064,10 @@ makeAvatarBtn.addEventListener("click", async () => {
   try {
     clearStatus();
 
-    const currentFileBeforeApply = sourceFile;
-
     /*
-      Для аватара:
-      1) если активен Crop и есть выделение — берём его
-      2) иначе берём квадрат по центру
-      3) накладываем круглую маску
+      Avatar по новой логике:
+      создаёт Result, но не перезаписывает Editor автоматически.
+      Для переноса в Editor используется Use as source.
     */
     processedFile = await buildAvatarFile(sourceFile, {
       cropRectCanvas: (activeMode === "crop" && cropRect) ? cropRect : null,
@@ -1108,20 +1080,10 @@ makeAvatarBtn.addEventListener("click", async () => {
       quality: Number(qualityInput.value) || 0.75
     });
 
-    pushHistory(currentFileBeforeApply);
-
     await showResult(processedFile);
+    useAsSourceBtn.disabled = false;
 
-    sourceFile = processedFile;
-    await loadSourceFileIntoEditor(sourceFile);
-
-    resetAllEditingState();
-    activeMode = null;
-    updateModeUI();
-    drawEditor();
-    updateHistoryButtons();
-
-    setStatus("Avatar is done OK");
+    setStatus("Avatar Result is ready OK");
   } catch (error) {
     setStatus("ERROR" + error.message);
   }
@@ -1149,9 +1111,8 @@ undoBtn.addEventListener("click", async () => {
     redoHistory.push(sourceFile);
 
     const previousFile = editHistory.pop();
-    sourceFile = previousFile;
+    await setEditorSource(previousFile, false);
 
-    await loadSourceFileIntoEditor(sourceFile);
     resetResult();
     resetAllEditingState();
     activeMode = null;
@@ -1187,9 +1148,8 @@ redoBtn.addEventListener("click", async () => {
     editHistory.push(sourceFile);
 
     const nextFile = redoHistory.pop();
-    sourceFile = nextFile;
+    await setEditorSource(nextFile, false);
 
-    await loadSourceFileIntoEditor(sourceFile);
     resetResult();
     resetAllEditingState();
     activeMode = null;
@@ -1218,10 +1178,10 @@ backToOriginalBtn.addEventListener("click", async () => {
   try {
     clearStatus();
 
-    sourceFile = originalFile;
     clearHistory();
+    await setEditorSource(originalFile, false);
 
-    await loadSourceFileIntoEditor(sourceFile);
+    resetResult();
     resetAllEditingState();
     activeMode = null;
     updateModeUI();
@@ -1245,7 +1205,7 @@ document
   .addEventListener("click", async () => {
 
     /*
-      По новой логике Save сохраняет только Result.
+      Save to disk сохраняет только Result.
       Если Result ещё не создан — просим нажать Apply.
     */
     if (!processedFile) {
@@ -1268,7 +1228,7 @@ document
 
       /*
         SVG
-        Это SVG-контейнер со встроенной картинкой
+        Это SVG-контейнер со встроенной картинкой.
       */
       if (format === "svg") {
         const svgFile = await buildSvgFileFromImageFile(exportFile);
@@ -1392,6 +1352,24 @@ function updateHistoryButtons() {
   undoBtn.disabled = editHistory.length === 0;
   redoBtn.disabled = redoHistory.length === 0;
   backToOriginalBtn.disabled = !originalFile;
+}
+
+/*
+================================
+УСТАНОВИТЬ SOURCE ДЛЯ EDITOR
+================================
+*/
+
+async function setEditorSource(file, addToUndo) {
+  if (!file) return;
+
+  if (addToUndo && sourceFile) {
+    pushHistory(sourceFile);
+  }
+
+  sourceFile = file;
+  await loadSourceFileIntoEditor(sourceFile);
+  updateHistoryButtons();
 }
 
 /*
@@ -2554,7 +2532,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-canvas & undo\redo fix | v2.4.1
+state model new | v2.5.0
   </div>
 
   <div class="row" id="build-down">
