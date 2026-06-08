@@ -812,20 +812,13 @@ updateFormatUI();
 ================================
 */
 
-photoInput.addEventListener("click", () => {
-  /*
-    Позволяет выбрать тот же самый файл повторно.
-    Без этого браузер может не вызвать change.
-  */
-  photoInput.value = "";
-});
-
 photoInput.addEventListener("change", async (event) => {
   clearStatus();
   resetResult();
   clearHistory();
 
-  const file = event.target.files[0] || null;
+  const file =
+    event.target.files[0] || null;
 
   if (!file) {
     clearCanvas();
@@ -835,6 +828,7 @@ photoInput.addEventListener("change", async (event) => {
 
   if (!file.type.startsWith("image/")) {
     setStatus("image file required");
+    photoInput.value = "";
     return;
   }
 
@@ -850,11 +844,19 @@ photoInput.addEventListener("change", async (event) => {
     drawEditor();
     updateHistoryButtons();
 
-downloadBtn.disabled = false;
-     
+    downloadBtn.disabled = false;
     backToOriginalBtn.disabled = false;
+
+    /*
+      Очищаем input только после успешного получения File.
+      Это позволяет потом выбрать тот же файл повторно,
+      но не ломает само открытие диалога выбора файла.
+    */
+    photoInput.value = "";
+
     setStatus("file loaded OK");
   } catch (error) {
+    photoInput.value = "";
     setStatus("ERROR" + error.message);
   }
 });
@@ -2527,7 +2529,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-убираем все сраные косяки ИИ undo\redo & canvas & loader| v3.0.0
+fix loader| v3.0.1
   </div>
 
   <div class="row" id="build-down">
