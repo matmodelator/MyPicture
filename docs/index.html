@@ -1213,8 +1213,11 @@ document
           canvasHeight: editCanvas.height,
           imageWidth: imageNaturalWidth,
           imageHeight: imageNaturalHeight,
-          useResize: activeMode === "resize" || resizeView.zoom > 1 || !isResizeDefault(),
+          useZoom: activeMode === "zoom" || resizeView.zoom > 1 || !isResizeDefault(),
           resizeView,
+          useOutputResize: activeMode === "resize",
+          targetWidth: Number(resizeWidth.value),
+          targetHeight: Number(resizeHeight.value),
           targetSize: Number(photoSize.value),
           colorState,
           quality: Number(qualityInput.value) || 0.75
@@ -1687,14 +1690,12 @@ async function buildFinalFile(file, options = {}) {
     finalWidth = Math.max(1, Math.round(Number(targetWidth) || srcW));
     finalHeight = Math.max(1, Math.round(Number(targetHeight) || srcH));
   } else {
-    const scale = Math.min(
-      targetSize / srcW,
-      targetSize / srcH,
-      1
-    );
-
-    finalWidth = Math.round(srcW * scale);
-    finalHeight = Math.round(srcH * scale);
+    /*
+      Для Crop / Zoom / Color размер не меняем.
+      Размер изображения меняет только отдельный режим Resize.
+    */
+    finalWidth = srcW;
+    finalHeight = srcH;
   }
 
   const outCanvas = document.createElement("canvas");
@@ -2503,7 +2504,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-result file Info| v2.3.2
+color size fix | v2.3.3
   </div>
 
   <div class="row" id="build-down">
