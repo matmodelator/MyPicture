@@ -474,6 +474,10 @@ The image is fitted into the page with selected margins and orientation.
           <button id="undoBtn" type="button" disabled>Undo</button>
           <div class="tool-tip">Undo one editing step.</div>
         </div>
+        <div class="tool-wrap" data-tip-wrap>
+  <button id="redoBtn" type="button" disabled>Redo</button>
+  <div class="tool-tip">Redo one Apply step.</div>
+</div> 
       </div>
 
       <div class="right-tools">
@@ -645,10 +649,14 @@ let activeMode = null;
 
 /*
   ИСТОРИЯ ПРАВОК
-  Сюда кладём предыдущее состояние Apply */
-  
-const applyHistory = [];
-let applyIndex = -1;
+
+      История Apply:
+      Undo / Redo ходят только по результатам,
+      созданным через Apply.
+      Если после Undo нажали Apply —
+      будущая ветка Redo отбрасывается.
+    */
+     
 const editHistory = [];
    
 /*
@@ -729,6 +737,7 @@ const colorModeBtn = document.getElementById("colorModeBtn");
 
 const backToOriginalBtn = document.getElementById("backToOriginalBtn");
 const undoBtn = document.getElementById("undoBtn");
+const redoBtn = document.getElementById("redoBtn");   
 const applyBtn = document.getElementById("applyBtn");
 const useAsSourceBtn = document.getElementById("useAsSourceBtn");
 const makeAvatarBtn = document.getElementById("makeAvatarBtn");
@@ -1055,31 +1064,42 @@ applyBtn.addEventListener("click", async () => {
       quality: Number(qualityInput.value) || 0.75
     });
 
-        await showResult(processedFile);
-    useAsSourceBtn.disabled = false;
+    
+await showResult(processedFile);
 
-    /*
-      История Apply:
-      Undo / Redo ходят только по результатам,
-      созданным через Apply.
-      Если после Undo нажали Apply —
-      будущая ветка Redo отбрасывается.
-    */
-    applyHistory.splice(applyIndex + 1);
+/*
+  Apply принимает результат:
+  - старый Editor кладём в Undo;
+  - Result становится новым Editor;
+  - справа Result остаётся для сравнения.
+*/
 
-    applyHistory.push(processedFile);
+pushHistory(sourceFile);
 
-    applyIndex =
-      applyHistory.length - 1;
+sourceFile =
+  processedFile;
 
-    updateHistoryButtons();
+await loadSourceFileIntoEditor(
+  sourceFile
+);
 
-    setStatus("Result is ready OK");
-  } catch (error) {
-    setStatus("ERROR" + error.message);
-  }
-});
+resetAllEditingState();
 
+activeMode =
+  null;
+
+updateModeUI();
+
+drawEditor();
+
+updateHistoryButtons();
+
+useAsSourceBtn.disabled =
+  false;
+
+setStatus("Result is ready OK");
+
+   
 /*
 ================================
 ИСПОЛЬЗОВАТЬ RESULT КАК SOURCE
@@ -1406,8 +1426,15 @@ function clearHistory() {
 }
 
 function updateHistoryButtons() {
-  undoBtn.disabled = editHistory.length === 0;
-  backToOriginalBtn.disabled = !originalFile;
+  undoBtn.disabled =
+    applyIndex <= 0;
+
+  redoBtn.disabled =
+    applyIndex < 0 ||
+    applyIndex >= applyHistory.length - 1;
+
+  backToOriginalBtn.disabled =
+    !originalFile;
 }
 
 /*
@@ -2562,7 +2589,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-fix loader 4 попытка | v3.0.5
+UNDO\REDO | v3.1.0
   </div>
 
   <div class="row" id="build-down">
