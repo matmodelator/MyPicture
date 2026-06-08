@@ -817,8 +817,14 @@ photoInput.addEventListener("change", async (event) => {
   resetResult();
   clearHistory();
 
-  const file =
-    event.target.files[0] || null;
+  const file = event.target.files[0] || null;
+
+  /*
+    Сразу после получения File очищаем input.
+    File уже лежит в переменной file, поэтому загрузку это не ломает.
+    Зато повторный выбор того же файла снова вызовет change.
+  */
+  photoInput.value = "";
 
   if (!file) {
     clearCanvas();
@@ -828,7 +834,6 @@ photoInput.addEventListener("change", async (event) => {
 
   if (!file.type.startsWith("image/")) {
     setStatus("image file required");
-    photoInput.value = "";
     return;
   }
 
@@ -847,20 +852,13 @@ photoInput.addEventListener("change", async (event) => {
     downloadBtn.disabled = false;
     backToOriginalBtn.disabled = false;
 
-    /*
-      Очищаем input только после успешного получения File.
-      Это позволяет потом выбрать тот же файл повторно,
-      но не ломает само открытие диалога выбора файла.
-    */
-    photoInput.value = "";
-
     setStatus("file loaded OK");
   } catch (error) {
-    photoInput.value = "";
     setStatus("ERROR" + error.message);
   }
 });
 
+ 
 /*
 ================================
 ПЕРЕКЛЮЧЕНИЕ РЕЖИМОВ
@@ -2529,7 +2527,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-fix loader| v3.0.1
+fix loader 2 попытка | v3.0.2
   </div>
 
   <div class="row" id="build-down">
