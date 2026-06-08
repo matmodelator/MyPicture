@@ -649,7 +649,8 @@ let activeMode = null;
   
 const applyHistory = [];
 let applyIndex = -1;
-
+const editHistory = [];
+   
 /*
   СОСТОЯНИЕ CROP
 */
@@ -816,75 +817,33 @@ photoInput.addEventListener("change", async (event) => {
   clearStatus();
 
   const file =
-    event.target.files && event.target.files.length
+    event.target.files && event.target.files[0]
       ? event.target.files[0]
       : null;
 
   if (!file) {
-    photoInput.value = "";
+    finishFileInput();
     return;
   }
 
   if (!file.type.startsWith("image/")) {
     setStatus("image file required");
-    photoInput.value = "";
+    finishFileInput();
     return;
   }
 
   try {
-    /*
-      Сначала полностью читаем и загружаем файл.
-      До успешной загрузки input не очищаем.
-    */
-    const dataUrl =
-      await readFileAsDataURL(file);
+    resetResult();
 
-    const img =
-      await loadImage(dataUrl);
-
-    /*
-      Только после успешного чтения файла
-      сбрасываем старое состояние редактора.
-    */
- 
     originalFile =
       file;
 
     sourceFile =
       file;
 
-    sourceImage =
-      img;
-
-    imageNaturalWidth =
-      img.width;
-
-    imageNaturalHeight =
-      img.height;
-
-    syncResizeFieldsFromImage(
-      img.width,
-      img.height
+    await loadSourceFileIntoEditor(
+      sourceFile
     );
-
-    /*
-      Canvas равен реальному размеру изображения.
-      CSS сам уменьшит отображение на экране.
-    */
-    editCanvas.width =
-      img.width;
-
-    editCanvas.height =
-      img.height;
-
-    editCanvas.style.display =
-      "block";
-
-    originalInfo.textContent =
-      "File name: " + file.name + "\n" +
-      "Format: " + file.name.split(".").pop().toUpperCase() + "\n" +
-      "File size: " + formatSize(file.size) + "\n" +
-      "Image size: " + img.width + " × " + img.height + " px";
 
     resetAllEditingState();
 
@@ -907,20 +866,33 @@ photoInput.addEventListener("change", async (event) => {
       "file loaded OK"
     );
 
-    /*
-      Только теперь очищаем input,
-      чтобы тот же файл можно было выбрать повторно.
-    */
-    photoInput.value =
-      "";
-
   } catch (error) {
     setStatus(
       "ERROR " +
       (error.message || error)
     );
+
+  } finally {
+    finishFileInput();
   }
 });
+
+/*
+================================
+ЗАВЕРШЕНИЕ FILE INPUT
+================================
+*/
+
+function finishFileInput() {
+  /*
+    Это отдельное завершение загрузчика.
+    Оно выполняется только после того,
+    как обработчик change закончил работу.
+  */
+
+  photoInput.value =
+    "";
+}
  
 /*
 ================================
@@ -2590,7 +2562,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-fix loader 4 попытка | v3.0.4
+fix loader 4 попытка | v3.0.5
   </div>
 
   <div class="row" id="build-down">
