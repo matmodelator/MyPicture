@@ -814,50 +814,115 @@ updateFormatUI();
 
 photoInput.addEventListener("change", async (event) => {
   clearStatus();
-  resetResult();
-  clearHistory();
 
-  const file = event.target.files[0] || null;
-
-  /*
-    Сразу после получения File очищаем input.
-    File уже лежит в переменной file, поэтому загрузку это не ломает.
-    Зато повторный выбор того же файла снова вызовет change.
-  */
-  photoInput.value = "";
+  const file =
+    event.target.files && event.target.files.length
+      ? event.target.files[0]
+      : null;
 
   if (!file) {
-    clearCanvas();
-    originalInfo.textContent = "";
+    photoInput.value = "";
     return;
   }
 
   if (!file.type.startsWith("image/")) {
     setStatus("image file required");
+    photoInput.value = "";
     return;
   }
 
   try {
-    originalFile = file;
-    sourceFile = file;
+    /*
+      Сначала полностью читаем и загружаем файл.
+      До успешной загрузки input не очищаем.
+    */
+    const dataUrl =
+      await readFileAsDataURL(file);
 
-    await loadSourceFileIntoEditor(sourceFile);
+    const img =
+      await loadImage(dataUrl);
+
+    /*
+      Только после успешного чтения файла
+      сбрасываем старое состояние редактора.
+    */
+    resetResult();
+    clearHistory();
+
+    originalFile =
+      file;
+
+    sourceFile =
+      file;
+
+    sourceImage =
+      img;
+
+    imageNaturalWidth =
+      img.width;
+
+    imageNaturalHeight =
+      img.height;
+
+    syncResizeFieldsFromImage(
+      img.width,
+      img.height
+    );
+
+    /*
+      Canvas равен реальному размеру изображения.
+      CSS сам уменьшит отображение на экране.
+    */
+    editCanvas.width =
+      img.width;
+
+    editCanvas.height =
+      img.height;
+
+    editCanvas.style.display =
+      "block";
+
+    originalInfo.textContent =
+      "File name: " + file.name + "\n" +
+      "Format: " + file.name.split(".").pop().toUpperCase() + "\n" +
+      "File size: " + formatSize(file.size) + "\n" +
+      "Image size: " + img.width + " × " + img.height + " px";
 
     resetAllEditingState();
-    activeMode = null;
+
+    activeMode =
+      null;
+
     updateModeUI();
+
     drawEditor();
+
     updateHistoryButtons();
 
-    downloadBtn.disabled = false;
-    backToOriginalBtn.disabled = false;
+    downloadBtn.disabled =
+      false;
 
-    setStatus("file loaded OK");
+    backToOriginalBtn.disabled =
+      false;
+
+    setStatus(
+      "file loaded OK"
+    );
+
+    /*
+      Только теперь очищаем input,
+      чтобы тот же файл можно было выбрать повторно.
+    */
+    photoInput.value =
+      "";
+
   } catch (error) {
-    setStatus("ERROR" + error.message);
+    setStatus(
+      "ERROR " +
+      (error.message || error)
+    );
   }
 });
-
  
 /*
 ================================
@@ -2527,7 +2592,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-fix loader 2 попытка | v3.0.2
+fix loader 3 попытка | v3.0.3
   </div>
 
   <div class="row" id="build-down">
