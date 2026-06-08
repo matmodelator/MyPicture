@@ -104,9 +104,6 @@ h2, h3 {
   white-space: nowrap;
 }
 
-#photoSize {
-  width: 260px;
-}
 
 /* ========================================
    ПАНЕЛЬ КНОПОК
@@ -373,10 +370,6 @@ button.active {
   .size-inline {
     min-width: 240px;
   }
-
-  #photoSize {
-    width: 220px;
-  }
 }
 </style>
 </head>
@@ -394,21 +387,6 @@ button.active {
       <div class="field">
         <label for="photoInput">File</label>
         <input id="photoInput" type="file" accept="image/*">
-      </div>
-
-      <!-- Размер фото в одну строку -->
-      <div class="size-inline">
-        <label class="size-inline-label" for="photoSize">
-          Size: <span id="photoSizeValue">800 px</span>
-        </label>
-        <input
-          id="photoSize"
-          type="range"
-          min="400"
-          max="1200"
-          step="50"
-          value="800"
-        >
       </div>
 
       <!-- Качество -->
@@ -502,7 +480,12 @@ The image is fitted into the page with selected margins and orientation.
 
         <div class="tool-wrap" data-tip-wrap>
           <button id="applyBtn" type="button">Apply</button>
-          <div class="tool-tip">Apply current effect and make it the new editor image.</div>
+          <div class="tool-tip">Build Result from current Editor settings.</div>
+        </div>
+
+        <div class="tool-wrap" data-tip-wrap>
+          <button id="useAsSourceBtn" type="button" disabled>Use as source</button>
+          <div class="tool-tip">Load Result back into Editor as the new source image.</div>
         </div>
 
         <div class="tool-wrap" data-tip-wrap>
@@ -605,7 +588,8 @@ Crop: activate the button and select a rectangle.
 Zoom: activate the button, click to set center, use wheel or pinch to zoom, drag when zoomed.
 Resize: set final Width and Height, with or without aspect ratio.
 Color: activate the button and adjust sliders.
-Apply: makes the result the new editor image and also shows it on the right.
+Apply: builds Result from the current Editor settings.
+Use as source: loads Result back into Editor.
 Avatar: creates a round avatar and also loads it back into the editor.
 Format: affects Save to disk.
     </div>
@@ -623,6 +607,7 @@ Format: affects Save to disk.
     <div class="panel">
       <h3>Result</h3>
       <div class="preview-box">
+        <div id="resultPlaceholder" class="note">Press Apply to make Result</div>
         <img id="resultPreview" alt="Result">
       </div>
       <div class="info" id="resultInfo"></div>
@@ -726,9 +711,6 @@ DOM-ЭЛЕМЕНТЫ
 const photoInput = document.getElementById("photoInput");
 const cropModeSelect = document.getElementById("cropMode");
 const qualityInput = document.getElementById("quality");
-const photoSize = document.getElementById("photoSize");
-const photoSizeValue = document.getElementById("photoSizeValue");
-
 /* Новый выбор формата */
 const outputFormat = document.getElementById("outputFormat");
 
@@ -746,6 +728,7 @@ const colorModeBtn = document.getElementById("colorModeBtn");
 const backToOriginalBtn = document.getElementById("backToOriginalBtn");
 const undoBtn = document.getElementById("undoBtn");
 const applyBtn = document.getElementById("applyBtn");
+const useAsSourceBtn = document.getElementById("useAsSourceBtn");
 const makeAvatarBtn = document.getElementById("makeAvatarBtn");
 const downloadBtn = document.getElementById("downloadBtn");
 /* Кнопка сохранения всегда активна */
@@ -771,6 +754,7 @@ const temperatureValue = document.getElementById("temperatureValue");
 const editCanvas = document.getElementById("editCanvas");
 const editCtx = editCanvas.getContext("2d");
 
+const resultPlaceholder = document.getElementById("resultPlaceholder");
 const resultPreview = document.getElementById("resultPreview");
 const originalInfo = document.getElementById("originalInfo");
 const resultInfo = document.getElementById("resultInfo");
@@ -804,16 +788,6 @@ tipWraps.forEach((wrap) => {
 /* Клик вне кнопок снимает закрепление подсказок */
 document.addEventListener("click", () => {
   tipWraps.forEach((item) => item.classList.remove("pinned"));
-});
-
-/*
-================================
-СЛАЙДЕР РАЗМЕРА 400–1200
-================================
-*/
-
-photoSize.addEventListener("input", () => {
-  photoSizeValue.textContent = photoSize.value + " px";
 });
 
 /*
@@ -1016,8 +990,11 @@ applyBtn.addEventListener("click", async () => {
   try {
     clearStatus();
 
-    const currentFileBeforeApply = sourceFile;
-
+    /*
+      Apply по новой логике:
+      Editor остаётся рабочей областью.
+      Result обновляется справа и НЕ становится source автоматически.
+    */
     processedFile = await buildFinalFile(sourceFile, {
       useCrop: activeMode === "crop" && !!cropRect,
       cropRectCanvas: cropRect,
@@ -1030,29 +1007,52 @@ applyBtn.addEventListener("click", async () => {
       useOutputResize: activeMode === "resize",
       targetWidth: Number(resizeWidth.value),
       targetHeight: Number(resizeHeight.value),
-      targetSize: Number(photoSize.value),
       colorState,
       quality: Number(qualityInput.value) || 0.75
     });
 
-    /* Сохраняем предыдущий шаг в историю */
-    pushHistory(currentFileBeforeApply);
-
-    /* Показать справа */
     await showResult(processedFile);
+    useAsSourceBtn.disabled = false;
 
-    /* И поставить результат обратно в Editor */
+    setStatus("Result is ready OK");
+  } catch (error) {
+    setStatus("ERROR" + error.message);
+  }
+});
+
+/*
+================================
+ИСПОЛЬЗОВАТЬ RESULT КАК SOURCE
+================================
+*/
+
+useAsSourceBtn.addEventListener("click", async () => {
+  if (!processedFile) {
+    setStatus("Press Apply to make Result");
+    return;
+  }
+
+  try {
+    clearStatus();
+
+    /*
+      Use as source:
+      переносит Result обратно в Editor.
+      Только здесь Result становится новым рабочим изображением.
+    */
+    pushHistory(sourceFile);
+
     sourceFile = processedFile;
     await loadSourceFileIntoEditor(sourceFile);
 
-    /* После Apply сбрасываем инструменты */
+    resetResult();
     resetAllEditingState();
     activeMode = null;
     updateModeUI();
     drawEditor();
     updateHistoryButtons();
 
-    setStatus("applied OK");
+    setStatus("Result loaded as source OK");
   } catch (error) {
     setStatus("ERROR" + error.message);
   }
@@ -1087,7 +1087,7 @@ makeAvatarBtn.addEventListener("click", async () => {
       canvasHeight: editCanvas.height,
       imageWidth: imageNaturalWidth,
       imageHeight: imageNaturalHeight,
-      targetSize: Number(photoSize.value),
+      targetSize: Number(resizeWidth.value) || 800,
       colorState,
       quality: Number(qualityInput.value) || 0.75
     });
@@ -1184,45 +1184,17 @@ document
   .addEventListener("click", async () => {
 
     /*
-      Сохраняем:
-      1) готовый результат, если он уже есть
-      2) иначе — текущий файл редактора
+      По новой логике Save сохраняет только Result.
+      Если Result ещё не создан — просим нажать Apply.
     */
-    const fileToSave = processedFile || sourceFile;
-
-    if (!fileToSave) {
-      setStatus("ERROR: no file to save");
+    if (!processedFile) {
+      setStatus("Press Apply to make Result");
       return;
     }
 
     try {
       const format = outputFormat.value;
-
-      /*
-        Для экспорта берём:
-        - processedFile, если он уже готов
-        - иначе сначала собираем текущий вид в webp
-      */
-      let exportFile = fileToSave;
-
-      if (!processedFile) {
-        exportFile = await buildFinalFile(fileToSave, {
-          useCrop: activeMode === "crop" && !!cropRect,
-          cropRectCanvas: cropRect,
-          canvasWidth: editCanvas.width,
-          canvasHeight: editCanvas.height,
-          imageWidth: imageNaturalWidth,
-          imageHeight: imageNaturalHeight,
-          useZoom: activeMode === "zoom" || resizeView.zoom > 1 || !isResizeDefault(),
-          resizeView,
-          useOutputResize: activeMode === "resize",
-          targetWidth: Number(resizeWidth.value),
-          targetHeight: Number(resizeHeight.value),
-          targetSize: Number(photoSize.value),
-          colorState,
-          quality: Number(qualityInput.value) || 0.75
-        });
-      }
+      const exportFile = processedFile;
 
       /*
         WEBP
@@ -1649,7 +1621,6 @@ async function buildFinalFile(file, options = {}) {
     useOutputResize,
     targetWidth,
     targetHeight,
-    targetSize = 800,
     colorState,
     quality = 0.8
   } = options;
@@ -1691,8 +1662,8 @@ async function buildFinalFile(file, options = {}) {
     finalHeight = Math.max(1, Math.round(Number(targetHeight) || srcH));
   } else {
     /*
-      Для Crop / Zoom / Color размер не меняем.
-      Размер изображения меняет только отдельный режим Resize.
+      Crop / Zoom / Color не меняют размер файла.
+      Реальный размер меняет только отдельный режим Resize.
     */
     finalWidth = srcW;
     finalHeight = srcH;
@@ -1839,6 +1810,7 @@ async function showResult(file) {
   processedObjectUrl = URL.createObjectURL(file);
   resultPreview.src = processedObjectUrl;
   resultPreview.style.display = "block";
+  resultPlaceholder.style.display = "none";
 
   const meta = await getImageMetaFromObjectUrl(processedObjectUrl);
 
@@ -2482,7 +2454,9 @@ function resetResult() {
   processedFile = null;
   resultPreview.src = "";
   resultPreview.style.display = "none";
+  resultPlaceholder.style.display = "block";
   resultInfo.textContent = "";
+  useAsSourceBtn.disabled = true;
   
    /*
     Кнопку Save to disk НЕ выключаем.
@@ -2504,7 +2478,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-color size fix | v2.3.3
+editor result logic | v2.4.0
   </div>
 
   <div class="row" id="build-down">
