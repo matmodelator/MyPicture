@@ -472,12 +472,7 @@ The image is fitted into the page with selected margins and orientation.
       <div class="center-tools">
         <div class="tool-wrap" data-tip-wrap>
           <button id="undoBtn" type="button" disabled>Undo</button>
-          <div class="tool-tip">Go to previous Apply result.</div>
-        </div>
-
-        <div class="tool-wrap" data-tip-wrap>
-          <button id="redoBtn" type="button" disabled>Redo</button>
-          <div class="tool-tip">Go to next Apply result.</div>
+          <div class="tool-tip">Undo one editing step.</div>
         </div>
       </div>
 
@@ -649,12 +644,11 @@ let imageNaturalHeight = 0;
 let activeMode = null;
 
 /*
-  ИСТОРИЯ APPLY
-  Undo / Redo работают только по готовым Result,
-  то есть между последовательными нажатиями Apply.
-*/
+  ИСТОРИЯ ПРАВОК
+  Сюда кладём предыдущее состояние Apply */
+  
 const applyHistory = [];
-let applyHistoryIndex = -1;
+let applyIndex = -1;
 
 /*
   СОСТОЯНИЕ CROP
@@ -734,7 +728,6 @@ const colorModeBtn = document.getElementById("colorModeBtn");
 
 const backToOriginalBtn = document.getElementById("backToOriginalBtn");
 const undoBtn = document.getElementById("undoBtn");
-const redoBtn = document.getElementById("redoBtn");
 const applyBtn = document.getElementById("applyBtn");
 const useAsSourceBtn = document.getElementById("useAsSourceBtn");
 const makeAvatarBtn = document.getElementById("makeAvatarBtn");
@@ -818,6 +811,14 @@ updateFormatUI();
 ЗАГРУЗКА ФАЙЛА
 ================================
 */
+
+photoInput.addEventListener("click", () => {
+  /*
+    Позволяет выбрать тот же самый файл повторно.
+    Без этого браузер может не вызвать change.
+  */
+  photoInput.value = "";
+});
 
 photoInput.addEventListener("change", async (event) => {
   clearStatus();
@@ -999,10 +1000,9 @@ applyBtn.addEventListener("click", async () => {
     clearStatus();
 
     /*
-      Apply:
-      строит новый Result из текущего Editor.
-      Editor не меняется.
-      Каждый Apply добавляется в историю Result.
+      Apply по новой логике:
+      Editor остаётся рабочей областью.
+      Result обновляется справа и НЕ становится source автоматически.
     */
     processedFile = await buildFinalFile(sourceFile, {
       useCrop: activeMode === "crop" && !!cropRect,
@@ -1020,10 +1020,23 @@ applyBtn.addEventListener("click", async () => {
       quality: Number(qualityInput.value) || 0.75
     });
 
-    pushApplyHistory(processedFile);
-
-    await showResult(processedFile);
+        await showResult(processedFile);
     useAsSourceBtn.disabled = false;
+
+    /*
+      История Apply:
+      Undo / Redo ходят только по результатам,
+      созданным через Apply.
+      Если после Undo нажали Apply —
+      будущая ветка Redo отбрасывается.
+    */
+    applyHistory.splice(applyIndex + 1);
+
+    applyHistory.push(processedFile);
+
+    applyIndex =
+      applyHistory.length - 1;
+
     updateHistoryButtons();
 
     setStatus("Result is ready OK");
@@ -1052,6 +1065,8 @@ useAsSourceBtn.addEventListener("click", async () => {
       переносит Result обратно в Editor.
       Только здесь Result становится новым рабочим изображением.
     */
+    pushHistory(sourceFile);
+
     sourceFile = processedFile;
     await loadSourceFileIntoEditor(sourceFile);
 
@@ -1083,6 +1098,8 @@ makeAvatarBtn.addEventListener("click", async () => {
   try {
     clearStatus();
 
+    const currentFileBeforeApply = sourceFile;
+
     /*
       Для аватара:
       1) если активен Crop и есть выделение — берём его
@@ -1099,6 +1116,8 @@ makeAvatarBtn.addEventListener("click", async () => {
       colorState,
       quality: Number(qualityInput.value) || 0.75
     });
+
+    pushHistory(currentFileBeforeApply);
 
     await showResult(processedFile);
 
@@ -1119,72 +1138,63 @@ makeAvatarBtn.addEventListener("click", async () => {
 
 /*
 ================================
-ОТМЕНИТЬ ПРАВКУ
+ОТМЕНИТЬ ПРАВКУ UNDO
 ================================
 */
 
-undoBtn.addEventListener("click", async () => {
-  if (applyHistoryIndex <= 0) {
-    setStatus("there is no previous Apply result");
-    return;
+undoBtn.addEventListener(
+  "click",
+  async () => {
+
+    if (applyIndex <= 0)
+      return;
+
+    applyIndex--;
+
+    sourceFile =
+      applyHistory[applyIndex];
+
+    await loadSourceFileIntoEditor(
+      sourceFile
+    );
+
+    setStatus(
+      "Undo Apply OK"
+    );
   }
-
-  try {
-    clearStatus();
-
-    /*
-      Undo:
-      переходит к предыдущему Result,
-      созданному через Apply.
-      Editor при этом не меняется.
-    */
-    applyHistoryIndex -= 1;
-    processedFile = applyHistory[applyHistoryIndex];
-
-    await showResult(processedFile);
-    useAsSourceBtn.disabled = false;
-    updateHistoryButtons();
-
-    setStatus("Previous Apply result OK");
-  } catch (error) {
-    setStatus("ERROR" + error.message);
-  }
-});
+);
 
 /*
 ================================
-ПОВТОРИТЬ APPLY RESULT
+ВЕРНУТЬ ПРАВКУ REDO
 ================================
 */
+   
+redoBtn.addEventListener(
+  "click",
+  async () => {
 
-redoBtn.addEventListener("click", async () => {
-  if (applyHistoryIndex >= applyHistory.length - 1) {
-    setStatus("there is no next Apply result");
-    return;
+    if (
+      applyIndex >=
+      applyHistory.length - 1
+    )
+      return;
+
+    applyIndex++;
+
+    sourceFile =
+      applyHistory[applyIndex];
+
+    await loadSourceFileIntoEditor(
+      sourceFile
+    );
+
+    setStatus(
+      "Redo Apply OK"
+    );
   }
-
-  try {
-    clearStatus();
-
-    /*
-      Redo:
-      переходит к следующему Result,
-      созданному через Apply.
-      Editor при этом не меняется.
-    */
-    applyHistoryIndex += 1;
-    processedFile = applyHistory[applyHistoryIndex];
-
-    await showResult(processedFile);
-    useAsSourceBtn.disabled = false;
-    updateHistoryButtons();
-
-    setStatus("Next Apply result OK");
-  } catch (error) {
-    setStatus("ERROR" + error.message);
-  }
-});
-
+);
+   
 /*
 ================================
 ВЕРНУТЬСЯ К ИСХОДНИКУ
@@ -1202,7 +1212,6 @@ backToOriginalBtn.addEventListener("click", async () => {
 
     sourceFile = originalFile;
     clearHistory();
-    resetResult();
 
     await loadSourceFileIntoEditor(sourceFile);
     resetAllEditingState();
@@ -1353,30 +1362,16 @@ document
 ================================
 */
 
-function pushApplyHistory(file) {
-  if (!file) return;
-
-  /*
-    Если после Undo нажали Apply,
-    все будущие Redo-результаты отбрасываются.
-  */
-  applyHistory.splice(applyHistoryIndex + 1);
-
-  applyHistory.push(file);
-  applyHistoryIndex = applyHistory.length - 1;
+function pushHistory(file) {
+  editHistory.push(file);
 }
 
 function clearHistory() {
-  applyHistory.length = 0;
-  applyHistoryIndex = -1;
+  editHistory.length = 0;
 }
 
 function updateHistoryButtons() {
-  undoBtn.disabled = applyHistoryIndex <= 0;
-  redoBtn.disabled =
-    applyHistoryIndex < 0 ||
-    applyHistoryIndex >= applyHistory.length - 1;
-
+  undoBtn.disabled = editHistory.length === 0;
   backToOriginalBtn.disabled = !originalFile;
 }
 
@@ -1395,17 +1390,13 @@ async function loadSourceFileIntoEditor(file) {
   imageNaturalHeight = img.height;
   syncResizeFieldsFromImage(img.width, img.height);
 
-  const maxCanvasWidth = 540;
-  const maxCanvasHeight = 720;
-
-  const scale = Math.min(
-    maxCanvasWidth / img.width,
-    maxCanvasHeight / img.height,
-    1
-  );
-
-  editCanvas.width = Math.round(img.width * scale);
-  editCanvas.height = Math.round(img.height * scale);
+  /*
+  Canvas всегда равен реальному размеру изображения.
+  Масштабирование на экране делает только CSS max-width.
+*/
+editCanvas.width = img.width;
+editCanvas.height = img.height;
+   
   editCanvas.style.display = "block";
 
   originalInfo.textContent =
@@ -2536,7 +2527,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-canvas apply history undo redo | v2.6.0
+убираем все сраные косяки ИИ undo\redo & canvas & loader| v3.0.0
   </div>
 
   <div class="row" id="build-down">
