@@ -1328,7 +1328,7 @@ backToOriginalBtn.addEventListener("click", async () => {
 
 /*
 ================================
-СКАЧАТЬ РЕЗУЛЬТАТ
+СКАЧАТЬ РЕЗУЛЬТАТ c именем
 ================================
 */
 
@@ -1336,10 +1336,6 @@ document
   .getElementById("downloadBtn")
   .addEventListener("click", async () => {
 
-    /*
-      По новой логике Save сохраняет только Result.
-      Если Result ещё не создан — просим нажать Apply.
-    */
     if (!processedFile) {
       setStatus("Press Apply to make Result");
       return;
@@ -1349,45 +1345,66 @@ document
       const format = outputFormat.value;
       const exportFile = processedFile;
 
-      /*
-        WEBP
-      */
+      const enteredName = prompt(
+        "Enter file name",
+        getBaseName(exportFile.name)
+      );
+
+      if (!enteredName) {
+        setStatus("save cancelled");
+        return;
+      }
+
+      const safeName =
+        enteredName.trim();
+
+      if (!safeName) {
+        setStatus("save cancelled");
+        return;
+      }
+
       if (format === "webp") {
-        await downloadFileDirect(exportFile);
+        const namedFile = new File(
+          [exportFile],
+          safeName + ".webp",
+          { type: "image/webp" }
+        );
+
+        await downloadFileDirect(namedFile);
         setStatus("save to disk OK");
         return;
       }
 
-      /*
-        SVG
-        Это SVG-контейнер со встроенной картинкой
-      */
       if (format === "svg") {
         const svgFile = await buildSvgFileFromImageFile(exportFile);
-        await downloadFileDirect(svgFile);
+
+        const namedFile = new File(
+          [svgFile],
+          safeName + ".svg",
+          { type: "image/svg+xml" }
+        );
+
+        await downloadFileDirect(namedFile);
         setStatus("save to disk OK");
         return;
       }
 
-      /*
-        PDF
-      */
       if (format === "pdf") {
         const pdfBlob = await buildPdfBlobFromImageFile(exportFile);
-        const baseName = getBaseName(exportFile.name);
 
-        const pdfFile = new File(
+        const namedFile = new File(
           [pdfBlob],
-          baseName + ".pdf",
+          safeName + ".pdf",
           { type: "application/pdf" }
         );
 
-        await downloadFileDirect(pdfFile);
+        await downloadFileDirect(namedFile);
         setStatus("save to disk OK");
         return;
       }
 
       setStatus("ERROR: unknown format");
+
     } catch (error) {
       setStatus("ERROR: " + (error.message || error));
     }
@@ -2651,7 +2668,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-Apply\Edit cleaning | v3.2.0
+Save  with Name | v3.4.0
   </div>
 
   <div class="row" id="build-down">
