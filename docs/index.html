@@ -497,15 +497,21 @@ The image is fitted into the page with selected margins and orientation.
           <div class="tool-tip">Create a round avatar from the current image.</div>
         </div>
 
-        <div class="actions">
-          <button type="button" id="downloadBtn">
-            Save to disk
-          </button>
+       <div class="actions">
 
-          <button type="button" id="uploadMvpBtn">
-            Upload to MVP
-          </button>
-        </div>
+  <button type="button" id="downloadBtn">
+    Save
+  </button>
+
+  <button type="button" id="sendBtn">
+    Send
+  </button>
+
+  <button type="button" id="printBtn">
+    Print
+  </button>
+
+</div>
 
       </div>
     </div>
@@ -588,14 +594,14 @@ With aspect ratio OFF, Width and Height are independent.
     <div class="status" id="status"></div>
 
     <div class="note">
-/*Crop: activate the button and select a rectangle.
+Crop: activate the button and select a rectangle.
 Zoom: activate the button, click to set center, use wheel or pinch to zoom, drag when zoomed.
 Resize: set final Width and Height, with or without aspect ratio.
 Color: activate the button and adjust sliders.
 Apply: builds Result from the current Editor settings.
 Use as source: loads Result back into Editor.
 Avatar: creates a round avatar and also loads it back into the editor.
-Format: affects Save to disk.*/
+Format: affects Save to disk.
     </div>
   </div>
 
@@ -633,13 +639,9 @@ let sourceFile = null;
 /* Самый первый загруженный файл */
 let originalFile = null;
 
-/* Имя результата для Save / Upload */
-let resultSavedFileName = "";
-   
 /* Последний обработанный результат */
 let processedFile = null;
 let processedObjectUrl = null;
-let resultSavedFileName = "";   
 
 /* Текущая картинка редактора */
 let sourceImage = null;
@@ -749,6 +751,13 @@ const makeAvatarBtn = document.getElementById("makeAvatarBtn");
 const downloadBtn = document.getElementById("downloadBtn");
 /* Кнопка сохранения всегда активна */
 downloadBtn.disabled = false;
+
+const sendBtn =
+  document.getElementById("sendBtn");
+
+const printBtn =
+  document.getElementById("printBtn");
+   
 const cropPanel = document.getElementById("cropPanel");
 const resizePanel = document.getElementById("resizePanel");
 const colorPanel = document.getElementById("colorPanel");
@@ -854,9 +863,6 @@ photoInput.addEventListener("change", async (event) => {
 
     sourceFile =
       file;
-
-   resultSavedFileName =
-  "";  
 
 editHistory.length = 0;
 
@@ -1335,7 +1341,7 @@ backToOriginalBtn.addEventListener("click", async () => {
 
 /*
 ================================
-СКАЧАТЬ РЕЗУЛЬТАТ
+СКАЧАТЬ РЕЗУЛЬТАТ c именем
 ================================
 */
 
@@ -1343,10 +1349,6 @@ document
   .getElementById("downloadBtn")
   .addEventListener("click", async () => {
 
-    /*
-      По новой логике Save сохраняет только Result.
-      Если Result ещё не создан — просим нажать Apply.
-    */
     if (!processedFile) {
       setStatus("Press Apply to make Result");
       return;
@@ -1356,56 +1358,66 @@ document
       const format = outputFormat.value;
       const exportFile = processedFile;
 
-const userName =
-  prompt(
-    "Save as",
-    getResultFileName()
-  );
+      const enteredName = prompt(
+        "Enter file name",
+        getBaseName(exportFile.name)
+      );
 
-if (!userName)
-  return;
+      if (!enteredName) {
+        setStatus("save cancelled");
+        return;
+      }
 
-resultSavedFileName =
-  buildResultFileName(userName);
+      const safeName =
+        enteredName.trim();
 
-      /*
-        WEBP
-      */
+      if (!safeName) {
+        setStatus("save cancelled");
+        return;
+      }
+
       if (format === "webp") {
-        await downloadFileDirect(exportFile);
+        const namedFile = new File(
+          [exportFile],
+          safeName + ".webp",
+          { type: "image/webp" }
+        );
+
+        await downloadFileDirect(namedFile);
         setStatus("save to disk OK");
         return;
       }
 
-      /*
-        SVG
-        Это SVG-контейнер со встроенной картинкой
-      */
       if (format === "svg") {
         const svgFile = await buildSvgFileFromImageFile(exportFile);
-        await downloadFileDirect(svgFile);
+
+        const namedFile = new File(
+          [svgFile],
+          safeName + ".svg",
+          { type: "image/svg+xml" }
+        );
+
+        await downloadFileDirect(namedFile);
         setStatus("save to disk OK");
         return;
       }
 
-      /*
-        PDF
-      */
       if (format === "pdf") {
         const pdfBlob = await buildPdfBlobFromImageFile(exportFile);
-       
-         const pdfFile = new File(
-  [pdfBlob],
-  resultSavedFileName,
-  { type: "application/pdf" }
-);
 
-        await downloadFileDirect(pdfFile);
+        const namedFile = new File(
+          [pdfBlob],
+          safeName + ".pdf",
+          { type: "application/pdf" }
+        );
+
+        await downloadFileDirect(namedFile);
         setStatus("save to disk OK");
         return;
       }
 
       setStatus("ERROR: unknown format");
+
     } catch (error) {
       setStatus("ERROR: " + (error.message || error));
     }
@@ -1415,7 +1427,7 @@ resultSavedFileName =
 ================================
 ЗАГРУЗИТЬ РЕЗУЛЬТАТ в ГАЛЕРЕЮ
 ================================
-*/
+
 
 document
   .getElementById("uploadMvpBtn")
@@ -1426,18 +1438,6 @@ document
       return;
     }
 
-const userName =
-  prompt(
-    "Upload as",
-    getResultFileName()
-  );
-
-if (!userName)
-  return;
-
-resultSavedFileName =
-  buildResultFileName(userName);
-     
     try {
       const params =
         new URLSearchParams(window.location.search);
@@ -1460,16 +1460,11 @@ resultSavedFileName =
         dataUrl
       );
 
-localStorage.setItem(
-  "rephoto_result_name",
-  resultSavedFileName
-);
-       
       localStorage.setItem(
         "mvp_photo_slot",
         String(slot)
       );
-     
+
       localStorage.setItem(
         "mvp_photo_return",
         returnPage
@@ -1489,9 +1484,134 @@ localStorage.setItem(
         (error.message || error)
       );
     }
-  });
+  }); */
 
-   
+/*
+================================
+SEND
+================================
+*/
+
+sendBtn.addEventListener("click", async () => {
+
+  if (!processedFile) {
+    setStatus("Press Apply to make Result");
+    return;
+  }
+
+  try {
+
+    if (!navigator.share) {
+      setStatus("ERROR: Share not supported");
+      return;
+    }
+
+    if (
+      navigator.canShare &&
+      !navigator.canShare({
+        files: [processedFile]
+      })
+    ) {
+      setStatus("ERROR: File share not supported");
+      return;
+    }
+
+    await navigator.share({
+      files: [processedFile]
+    });
+
+    setStatus("share OK");
+
+  } catch (error) {
+
+    if (
+      error &&
+      error.name === "AbortError"
+    ) {
+      setStatus("share cancelled");
+      return;
+    }
+
+    setStatus(
+      "ERROR: " +
+      (error.message || error)
+    );
+  }
+});
+
+/*
+================================
+PRINT
+================================
+*/
+
+printBtn.addEventListener("click", async () => {
+
+  if (!processedFile) {
+    setStatus("Press Apply to make Result");
+    return;
+  }
+
+  try {
+
+    const url =
+      URL.createObjectURL(processedFile);
+
+    const win =
+      window.open("", "_blank");
+
+    if (!win) {
+      URL.revokeObjectURL(url);
+      setStatus("ERROR: popup blocked");
+      return;
+    }
+
+    win.document.write(`
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Print</title>
+<style>
+body{
+  margin:0;
+  background:white;
+}
+img{
+  display:block;
+  max-width:100%;
+  margin:auto;
+}
+</style>
+</head>
+<body>
+<img src="${url}">
+</body>
+</html>
+`);
+
+    win.document.close();
+
+    win.onload = () => {
+      win.focus();
+      win.print();
+
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 3000);
+    };
+
+    setStatus("print dialog OK");
+
+  } catch (error) {
+
+    setStatus(
+      "ERROR: " +
+      (error.message || error)
+    );
+  }
+});   
+ 
 /*
 ================================
 РАБОТА С ИСТОРИЕЙ
@@ -1559,11 +1679,8 @@ editCanvas.height = img.height;
    
   editCanvas.style.display = "block";
 
- const infoFile =
-  originalFile || file;
-
-originalInfo.textContent =
-  "File name: " + infoFile.name + "\n" +
+  originalInfo.textContent =
+  "Source name: " + infoFile.name + "\n" +
   "Source format: " + infoFile.name.split(".").pop().toUpperCase() + "\n" +
   "Source file size: " + formatSize(infoFile.size) + "\n" +
   "Source image size: " + img.width + " × " + img.height + " px";
@@ -2010,77 +2127,6 @@ async function buildAvatarFile(file, options = {}) {
 
 /*
 ================================
-ИМЯ РЕЗУЛЬТАТА
-================================
-*/
-
-function getSourceFileName() {
-  if (originalFile && originalFile.name)
-    return originalFile.name;
-
-  if (sourceFile && sourceFile.name)
-    return sourceFile.name;
-
-  return "result";
-}
-
-function getResultExtension() {
-  return outputFormat.value || "webp";
-}
-
-function getResultFileName() {
-  if (resultSavedFileName)
-    return resultSavedFileName;
-
-  return getSourceFileName();
-}
-
-function setResultFileName(name) {
-  resultSavedFileName =
-    name || "";
-}
-
-function buildResultFileNameFromUserInput(inputName) {
-  const baseName =
-    getBaseName(inputName || getSourceFileName());
-
-  const ext =
-    getResultExtension();
-
-  return baseName + "." + ext;
-}
-
-function getResultExtension() {
-  return outputFormat.value || "webp";
-}
-
-function getResultFileName() {
-  if (resultSavedFileName)
-    return resultSavedFileName;
-
-  if (originalFile && originalFile.name)
-    return originalFile.name;
-
-  return "result";
-}
-
-function buildResultFileName(inputName) {
-  const baseName =
-    getBaseName(inputName || getResultFileName());
-
-  return baseName + "." + getResultExtension();
-}
-
-function updateResultInfo(file, meta) {
-  resultInfo.textContent =
-    "Result file name: " + getResultFileName() + "\n" +
-    "Result format: " + getResultExtension().toUpperCase() + "\n" +
-    "Result file size: " + formatSize(file.size) + "\n" +
-    "Result image size: " + meta.width + " × " + meta.height + " px";
-}   
-   
-/*
-================================
 ПОКАЗАТЬ РЕЗУЛЬТАТ
 ================================
 */
@@ -2103,10 +2149,10 @@ async function showResult(file) {
     : "0";
 
   resultInfo.textContent =
-  "File name: " + getResultFileName() + "\n" +
+  "Result File name: " + getResultFileName() + "\n" +
   "Result format: " + getResultExtension().toUpperCase() + "\n" +
   "Result file size: " + formatSize(file.size) + "\n" +
-  "Result image size: " + meta.width + " × " + meta.height + " px";
+  "Result image size: " + meta.width + " × " + meta.height + " px;
 }
 
 /*
@@ -2567,8 +2613,7 @@ async function downloadFileDirect(file) {
 
   const link = document.createElement("a");
   link.href = downloadUrl;
-  link.download =
-  resultSavedFileName || file.name || "download";
+  link.download = file.name || "download";
   link.click();
 
   setTimeout(() => {
@@ -2743,7 +2788,7 @@ function resetResult() {
   useAsSourceBtn.disabled = true;
   
    /*
-    Кнопку Save to disk НЕ выключаем.
+    Кнопку Save НЕ выключаем.
     Сохранять можно либо результат, либо текущий файл редактора.
   
   downloadBtn.disabled = true; */
@@ -2762,7 +2807,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-Add Save functions | v3.3.2
+Send & Print instead of UpLoad + Names | v4.0.0
   </div>
 
   <div class="row" id="build-down">
@@ -2810,3 +2855,5 @@ Add Save functions | v3.3.2
 
 </body>
 </html>
+
+
