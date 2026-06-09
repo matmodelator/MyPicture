@@ -497,15 +497,21 @@ The image is fitted into the page with selected margins and orientation.
           <div class="tool-tip">Create a round avatar from the current image.</div>
         </div>
 
-        <div class="actions">
-          <button type="button" id="downloadBtn">
-            Save to disk
-          </button>
+       <div class="actions">
 
-          <button type="button" id="uploadMvpBtn">
-            Upload to MVP
-          </button>
-        </div>
+  <button type="button" id="downloadBtn">
+    Save
+  </button>
+
+  <button type="button" id="sendBtn">
+    Send
+  </button>
+
+  <button type="button" id="printBtn">
+    Print
+  </button>
+
+</div>
 
       </div>
     </div>
@@ -745,6 +751,13 @@ const makeAvatarBtn = document.getElementById("makeAvatarBtn");
 const downloadBtn = document.getElementById("downloadBtn");
 /* Кнопка сохранения всегда активна */
 downloadBtn.disabled = false;
+
+const sendBtn =
+  document.getElementById("sendBtn");
+
+const printBtn =
+  document.getElementById("printBtn");
+   
 const cropPanel = document.getElementById("cropPanel");
 const resizePanel = document.getElementById("resizePanel");
 const colorPanel = document.getElementById("colorPanel");
@@ -1414,7 +1427,7 @@ document
 ================================
 ЗАГРУЗИТЬ РЕЗУЛЬТАТ в ГАЛЕРЕЮ
 ================================
-*/
+
 
 document
   .getElementById("uploadMvpBtn")
@@ -1471,8 +1484,134 @@ document
         (error.message || error)
       );
     }
-  });
+  }); */
 
+/*
+================================
+SEND
+================================
+*/
+
+sendBtn.addEventListener("click", async () => {
+
+  if (!processedFile) {
+    setStatus("Press Apply to make Result");
+    return;
+  }
+
+  try {
+
+    if (!navigator.share) {
+      setStatus("ERROR: Share not supported");
+      return;
+    }
+
+    if (
+      navigator.canShare &&
+      !navigator.canShare({
+        files: [processedFile]
+      })
+    ) {
+      setStatus("ERROR: File share not supported");
+      return;
+    }
+
+    await navigator.share({
+      files: [processedFile]
+    });
+
+    setStatus("share OK");
+
+  } catch (error) {
+
+    if (
+      error &&
+      error.name === "AbortError"
+    ) {
+      setStatus("share cancelled");
+      return;
+    }
+
+    setStatus(
+      "ERROR: " +
+      (error.message || error)
+    );
+  }
+});
+
+/*
+================================
+PRINT
+================================
+*/
+
+printBtn.addEventListener("click", async () => {
+
+  if (!processedFile) {
+    setStatus("Press Apply to make Result");
+    return;
+  }
+
+  try {
+
+    const url =
+      URL.createObjectURL(processedFile);
+
+    const win =
+      window.open("", "_blank");
+
+    if (!win) {
+      URL.revokeObjectURL(url);
+      setStatus("ERROR: popup blocked");
+      return;
+    }
+
+    win.document.write(`
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Print</title>
+<style>
+body{
+  margin:0;
+  background:white;
+}
+img{
+  display:block;
+  max-width:100%;
+  margin:auto;
+}
+</style>
+</head>
+<body>
+<img src="${url}">
+</body>
+</html>
+`);
+
+    win.document.close();
+
+    win.onload = () => {
+      win.focus();
+      win.print();
+
+      setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 3000);
+    };
+
+    setStatus("print dialog OK");
+
+  } catch (error) {
+
+    setStatus(
+      "ERROR: " +
+      (error.message || error)
+    );
+  }
+});   
+ 
 /*
 ================================
 РАБОТА С ИСТОРИЕЙ
@@ -2649,7 +2788,7 @@ function resetResult() {
   useAsSourceBtn.disabled = true;
   
    /*
-    Кнопку Save to disk НЕ выключаем.
+    Кнопку Save НЕ выключаем.
     Сохранять можно либо результат, либо текущий файл редактора.
   
   downloadBtn.disabled = true; */
@@ -2668,7 +2807,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-Save  with Name | v3.4.0
+Send & Print instead of UpLoad | v4.0.0
   </div>
 
   <div class="row" id="build-down">
