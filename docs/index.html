@@ -1680,10 +1680,10 @@ editCanvas.height = img.height;
   editCanvas.style.display = "block";
 
   originalInfo.textContent =
-  "Source name: " + infoFile.name + "\n" +
-  "Source format: " + infoFile.name.split(".").pop().toUpperCase() + "\n" +
-  "Source file size: " + formatSize(infoFile.size) + "\n" +
-  "Source image size: " + img.width + " × " + img.height + " px";
+  "File name: " + file.name + "\n" +
+  "Format: " + file.name.split(".").pop().toUpperCase() + "\n" +
+  "File size: " + formatSize(file.size) + "\n" +
+  "Image size: " + img.width + " × " + img.height + " px";
 }
 
 /*
@@ -2149,10 +2149,10 @@ async function showResult(file) {
     : "0";
 
   resultInfo.textContent =
-  "Result File name: " + getResultFileName() + "\n" +
-  "Result format: " + getResultExtension().toUpperCase() + "\n" +
-  "Result file size: " + formatSize(file.size) + "\n" +
-  "Result image size: " + meta.width + " × " + meta.height + " px;
+    "File name: " + file.name + "\n" +
+  "Format: " + file.name.split(".").pop().toUpperCase() + "\n" +
+  "File size: " + formatSize(file.size) + "\n" +
+  "Image size: " + meta.width + " × " + meta.height + " px";
 }
 
 /*
@@ -2807,7 +2807,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-Send & Print instead of UpLoad + Names | v4.0.0
+Send & Print instead of UpLoad | v4.0.1
   </div>
 
   <div class="row" id="build-down">
@@ -2855,5 +2855,3 @@ Send & Print instead of UpLoad + Names | v4.0.0
 
 </body>
 </html>
-
-
