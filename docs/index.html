@@ -639,6 +639,7 @@ let resultSavedFileName = "";
 /* Последний обработанный результат */
 let processedFile = null;
 let processedObjectUrl = null;
+let resultSavedFileName = "";   
 
 /* Текущая картинка редактора */
 let sourceImage = null;
@@ -2048,6 +2049,35 @@ function buildResultFileNameFromUserInput(inputName) {
 
   return baseName + "." + ext;
 }
+
+function getResultExtension() {
+  return outputFormat.value || "webp";
+}
+
+function getResultFileName() {
+  if (resultSavedFileName)
+    return resultSavedFileName;
+
+  if (originalFile && originalFile.name)
+    return originalFile.name;
+
+  return "result";
+}
+
+function buildResultFileName(inputName) {
+  const baseName =
+    getBaseName(inputName || getResultFileName());
+
+  return baseName + "." + getResultExtension();
+}
+
+function updateResultInfo(file, meta) {
+  resultInfo.textContent =
+    "Result file name: " + getResultFileName() + "\n" +
+    "Result format: " + getResultExtension().toUpperCase() + "\n" +
+    "Result file size: " + formatSize(file.size) + "\n" +
+    "Result image size: " + meta.width + " × " + meta.height + " px";
+}   
    
 /*
 ================================
@@ -2732,7 +2762,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-Save fix | v3.3.1
+Add Save functions | v3.3.2
   </div>
 
   <div class="row" id="build-down">
