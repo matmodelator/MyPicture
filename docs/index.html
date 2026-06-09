@@ -588,14 +588,14 @@ With aspect ratio OFF, Width and Height are independent.
     <div class="status" id="status"></div>
 
     <div class="note">
-Crop: activate the button and select a rectangle.
+/*Crop: activate the button and select a rectangle.
 Zoom: activate the button, click to set center, use wheel or pinch to zoom, drag when zoomed.
 Resize: set final Width and Height, with or without aspect ratio.
 Color: activate the button and adjust sliders.
 Apply: builds Result from the current Editor settings.
 Use as source: loads Result back into Editor.
 Avatar: creates a round avatar and also loads it back into the editor.
-Format: affects Save to disk.
+Format: affects Save to disk.*/
     </div>
   </div>
 
@@ -633,6 +633,9 @@ let sourceFile = null;
 /* Самый первый загруженный файл */
 let originalFile = null;
 
+/* Имя результата для Save / Upload */
+let resultSavedFileName = "";
+   
 /* Последний обработанный результат */
 let processedFile = null;
 let processedObjectUrl = null;
@@ -850,6 +853,9 @@ photoInput.addEventListener("change", async (event) => {
 
     sourceFile =
       file;
+
+   resultSavedFileName =
+  "";  
 
 editHistory.length = 0;
 
@@ -1336,35 +1342,65 @@ document
   .getElementById("downloadBtn")
   .addEventListener("click", async () => {
 
-    /*
-      По новой логике Save сохраняет только Result.
-      Если Result ещё не создан — просим нажать Apply.
-    */
     if (!processedFile) {
       setStatus("Press Apply to make Result");
       return;
     }
 
+    const userName =
+      prompt(
+        "Save as",
+        getResultFileName()
+      );
+
+    if (!userName)
+      return;
+
+    resultSavedFileName =
+      buildResultFileName(userName);
+
     try {
-      const format = outputFormat.value;
-      const exportFile = processedFile;
+      const format =
+        outputFormat.value;
+
+      const exportFile =
+        processedFile;
+
+      const meta =
+        await getImageMetaFromObjectUrl(
+          processedObjectUrl
+        );
+
+      updateResultInfo(
+        processedFile,
+        meta
+      );
 
       /*
         WEBP
       */
       if (format === "webp") {
-        await downloadFileDirect(exportFile);
+        await downloadFileDirect(
+          exportFile
+        );
+
         setStatus("save to disk OK");
         return;
       }
 
       /*
         SVG
-        Это SVG-контейнер со встроенной картинкой
       */
       if (format === "svg") {
-        const svgFile = await buildSvgFileFromImageFile(exportFile);
-        await downloadFileDirect(svgFile);
+        const svgFile =
+          await buildSvgFileFromImageFile(
+            exportFile
+          );
+
+        await downloadFileDirect(
+          svgFile
+        );
+
         setStatus("save to disk OK");
         return;
       }
@@ -1373,26 +1409,36 @@ document
         PDF
       */
       if (format === "pdf") {
-        const pdfBlob = await buildPdfBlobFromImageFile(exportFile);
-        const baseName = getBaseName(exportFile.name);
+        const pdfBlob =
+          await buildPdfBlobFromImageFile(
+            exportFile
+          );
 
-        const pdfFile = new File(
-          [pdfBlob],
-          baseName + ".pdf",
-          { type: "application/pdf" }
+        const pdfFile =
+          new File(
+            [pdfBlob],
+            resultSavedFileName,
+            { type: "application/pdf" }
+          );
+
+        await downloadFileDirect(
+          pdfFile
         );
 
-        await downloadFileDirect(pdfFile);
         setStatus("save to disk OK");
         return;
       }
 
       setStatus("ERROR: unknown format");
+
     } catch (error) {
-      setStatus("ERROR: " + (error.message || error));
+      setStatus(
+        "ERROR: " +
+        (error.message || error)
+      );
     }
   });
-
+   
 /*
 ================================
 ЗАГРУЗИТЬ РЕЗУЛЬТАТ в ГАЛЕРЕЮ
@@ -1408,9 +1454,33 @@ document
       return;
     }
 
+    const userName =
+      prompt(
+        "Upload as",
+        getResultFileName()
+      );
+
+    if (!userName)
+      return;
+
+    resultSavedFileName =
+      buildResultFileName(userName);
+
     try {
+      const meta =
+        await getImageMetaFromObjectUrl(
+          processedObjectUrl
+        );
+
+      updateResultInfo(
+        processedFile,
+        meta
+      );
+
       const params =
-        new URLSearchParams(window.location.search);
+        new URLSearchParams(
+          window.location.search
+        );
 
       const slot =
         params.get("slot")
@@ -1423,11 +1493,18 @@ document
         || "gallery.html";
 
       const dataUrl =
-        await readFileAsDataURL(processedFile);
+        await readFileAsDataURL(
+          processedFile
+        );
 
       localStorage.setItem(
         "rephoto_result",
         dataUrl
+      );
+
+      localStorage.setItem(
+        "rephoto_result_name",
+        resultSavedFileName
       );
 
       localStorage.setItem(
@@ -1455,7 +1532,7 @@ document
       );
     }
   });
-
+   
 /*
 ================================
 РАБОТА С ИСТОРИЕЙ
@@ -1523,11 +1600,14 @@ editCanvas.height = img.height;
    
   editCanvas.style.display = "block";
 
-  originalInfo.textContent =
-  "File name: " + file.name + "\n" +
-  "Format: " + file.name.split(".").pop().toUpperCase() + "\n" +
-  "File size: " + formatSize(file.size) + "\n" +
-  "Image size: " + img.width + " × " + img.height + " px";
+ const infoFile =
+  originalFile || file;
+
+originalInfo.textContent =
+  "Source file name: " + infoFile.name + "\n" +
+  "Source format: " + infoFile.name.split(".").pop().toUpperCase() + "\n" +
+  "Source file size: " + formatSize(infoFile.size) + "\n" +
+  "Source image size: " + img.width + " × " + img.height + " px";
 }
 
 /*
@@ -1971,6 +2051,48 @@ async function buildAvatarFile(file, options = {}) {
 
 /*
 ================================
+ИМЯ РЕЗУЛЬТАТА
+================================
+*/
+
+function getSourceFileName() {
+  if (originalFile && originalFile.name)
+    return originalFile.name;
+
+  if (sourceFile && sourceFile.name)
+    return sourceFile.name;
+
+  return "result";
+}
+
+function getResultExtension() {
+  return outputFormat.value || "webp";
+}
+
+function getResultFileName() {
+  if (resultSavedFileName)
+    return resultSavedFileName;
+
+  return getSourceFileName();
+}
+
+function setResultFileName(name) {
+  resultSavedFileName =
+    name || "";
+}
+
+function buildResultFileNameFromUserInput(inputName) {
+  const baseName =
+    getBaseName(inputName || getSourceFileName());
+
+  const ext =
+    getResultExtension();
+
+  return baseName + "." + ext;
+}
+   
+/*
+================================
 ПОКАЗАТЬ РЕЗУЛЬТАТ
 ================================
 */
@@ -1993,10 +2115,10 @@ async function showResult(file) {
     : "0";
 
   resultInfo.textContent =
-    "File name: " + file.name + "\n" +
-  "Format: " + file.name.split(".").pop().toUpperCase() + "\n" +
-  "File size: " + formatSize(file.size) + "\n" +
-  "Image size: " + meta.width + " × " + meta.height + " px";
+  "Result file name: " + getResultFileName() + "\n" +
+  "Result format: " + getResultExtension().toUpperCase() + "\n" +
+  "Result file size: " + formatSize(file.size) + "\n" +
+  "Result image size: " + meta.width + " × " + meta.height + " px";
 }
 
 /*
@@ -2651,7 +2773,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-Apply\Edit cleaning | v3.2.0
+Save\UpLoad Name\Format | v3.3.0
   </div>
 
   <div class="row" id="build-down">
