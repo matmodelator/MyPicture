@@ -1342,65 +1342,47 @@ document
   .getElementById("downloadBtn")
   .addEventListener("click", async () => {
 
+    /*
+      По новой логике Save сохраняет только Result.
+      Если Result ещё не создан — просим нажать Apply.
+    */
     if (!processedFile) {
       setStatus("Press Apply to make Result");
       return;
     }
 
-    const userName =
-      prompt(
-        "Save as",
-        getResultFileName()
-      );
-
-    if (!userName)
-      return;
-
-    resultSavedFileName =
-      buildResultFileName(userName);
-
     try {
-      const format =
-        outputFormat.value;
+      const format = outputFormat.value;
+      const exportFile = processedFile;
 
-      const exportFile =
-        processedFile;
+const userName =
+  prompt(
+    "Save as",
+    getResultFileName()
+  );
 
-      const meta =
-        await getImageMetaFromObjectUrl(
-          processedObjectUrl
-        );
+if (!userName)
+  return;
 
-      updateResultInfo(
-        processedFile,
-        meta
-      );
+resultSavedFileName =
+  buildResultFileName(userName);
 
       /*
         WEBP
       */
       if (format === "webp") {
-        await downloadFileDirect(
-          exportFile
-        );
-
+        await downloadFileDirect(exportFile);
         setStatus("save to disk OK");
         return;
       }
 
       /*
         SVG
+        Это SVG-контейнер со встроенной картинкой
       */
       if (format === "svg") {
-        const svgFile =
-          await buildSvgFileFromImageFile(
-            exportFile
-          );
-
-        await downloadFileDirect(
-          svgFile
-        );
-
+        const svgFile = await buildSvgFileFromImageFile(exportFile);
+        await downloadFileDirect(svgFile);
         setStatus("save to disk OK");
         return;
       }
@@ -1409,36 +1391,25 @@ document
         PDF
       */
       if (format === "pdf") {
-        const pdfBlob =
-          await buildPdfBlobFromImageFile(
-            exportFile
-          );
+        const pdfBlob = await buildPdfBlobFromImageFile(exportFile);
+       
+         const pdfFile = new File(
+  [pdfBlob],
+  resultSavedFileName,
+  { type: "application/pdf" }
+);
 
-        const pdfFile =
-          new File(
-            [pdfBlob],
-            resultSavedFileName,
-            { type: "application/pdf" }
-          );
-
-        await downloadFileDirect(
-          pdfFile
-        );
-
+        await downloadFileDirect(pdfFile);
         setStatus("save to disk OK");
         return;
       }
 
       setStatus("ERROR: unknown format");
-
     } catch (error) {
-      setStatus(
-        "ERROR: " +
-        (error.message || error)
-      );
+      setStatus("ERROR: " + (error.message || error));
     }
   });
-   
+
 /*
 ================================
 ЗАГРУЗИТЬ РЕЗУЛЬТАТ в ГАЛЕРЕЮ
@@ -1454,33 +1425,21 @@ document
       return;
     }
 
-    const userName =
-      prompt(
-        "Upload as",
-        getResultFileName()
-      );
+const userName =
+  prompt(
+    "Upload as",
+    getResultFileName()
+  );
 
-    if (!userName)
-      return;
+if (!userName)
+  return;
 
-    resultSavedFileName =
-      buildResultFileName(userName);
-
+resultSavedFileName =
+  buildResultFileName(userName);
+     
     try {
-      const meta =
-        await getImageMetaFromObjectUrl(
-          processedObjectUrl
-        );
-
-      updateResultInfo(
-        processedFile,
-        meta
-      );
-
       const params =
-        new URLSearchParams(
-          window.location.search
-        );
+        new URLSearchParams(window.location.search);
 
       const slot =
         params.get("slot")
@@ -1493,25 +1452,23 @@ document
         || "gallery.html";
 
       const dataUrl =
-        await readFileAsDataURL(
-          processedFile
-        );
+        await readFileAsDataURL(processedFile);
 
       localStorage.setItem(
         "rephoto_result",
         dataUrl
       );
 
-      localStorage.setItem(
-        "rephoto_result_name",
-        resultSavedFileName
-      );
-
+localStorage.setItem(
+  "rephoto_result_name",
+  resultSavedFileName
+);
+       
       localStorage.setItem(
         "mvp_photo_slot",
         String(slot)
       );
-
+     
       localStorage.setItem(
         "mvp_photo_return",
         returnPage
@@ -1532,6 +1489,7 @@ document
       );
     }
   });
+
    
 /*
 ================================
@@ -1604,7 +1562,7 @@ editCanvas.height = img.height;
   originalFile || file;
 
 originalInfo.textContent =
-  "Source file name: " + infoFile.name + "\n" +
+  "File name: " + infoFile.name + "\n" +
   "Source format: " + infoFile.name.split(".").pop().toUpperCase() + "\n" +
   "Source file size: " + formatSize(infoFile.size) + "\n" +
   "Source image size: " + img.width + " × " + img.height + " px";
@@ -2115,7 +2073,7 @@ async function showResult(file) {
     : "0";
 
   resultInfo.textContent =
-  "Result file name: " + getResultFileName() + "\n" +
+  "File name: " + getResultFileName() + "\n" +
   "Result format: " + getResultExtension().toUpperCase() + "\n" +
   "Result file size: " + formatSize(file.size) + "\n" +
   "Result image size: " + meta.width + " × " + meta.height + " px";
@@ -2579,7 +2537,8 @@ async function downloadFileDirect(file) {
 
   const link = document.createElement("a");
   link.href = downloadUrl;
-  link.download = file.name || "download";
+  link.download =
+  resultSavedFileName || file.name || "download";
   link.click();
 
   setTimeout(() => {
@@ -2773,7 +2732,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-Save\UpLoad Name\Format | v3.3.0
+Save fix | v3.3.1
   </div>
 
   <div class="row" id="build-down">
