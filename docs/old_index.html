@@ -104,9 +104,6 @@ h2, h3 {
   white-space: nowrap;
 }
 
-#photoSize {
-  width: 260px;
-}
 
 /* ========================================
    ПАНЕЛЬ КНОПОК
@@ -373,10 +370,6 @@ button.active {
   .size-inline {
     min-width: 240px;
   }
-
-  #photoSize {
-    width: 220px;
-  }
 }
 </style>
 </head>
@@ -394,21 +387,6 @@ button.active {
       <div class="field">
         <label for="photoInput">File</label>
         <input id="photoInput" type="file" accept="image/*">
-      </div>
-
-      <!-- Размер фото в одну строку -->
-      <div class="size-inline">
-        <label class="size-inline-label" for="photoSize">
-          Size: <span id="photoSizeValue">800 px</span>
-        </label>
-        <input
-          id="photoSize"
-          type="range"
-          min="400"
-          max="1200"
-          step="50"
-          value="800"
-        >
       </div>
 
       <!-- Качество -->
@@ -457,8 +435,8 @@ button.active {
       </div>
 
       <div class="note">
-PDF создаётся из текущего результата.
-Изображение вписывается в страницу с указанными полями и ориентацией.
+PDF is created from the current result.
+The image is fitted into the page with selected margins and orientation.
       </div>
     </div>
 
@@ -471,8 +449,13 @@ PDF создаётся из текущего результата.
         </div>
 
         <div class="tool-wrap" data-tip-wrap>
-          <button id="resizeModeBtn" type="button">Resize</button>
+          <button id="zoomModeBtn" type="button">Zoom</button>
           <div class="tool-tip">Set center, zoom with wheel or pinch, drag the image when zoomed.</div>
+        </div>
+
+        <div class="tool-wrap" data-tip-wrap>
+          <button id="resizeModeBtn" type="button">Resize</button>
+          <div class="tool-tip">Change final image width and height, with or without aspect ratio.</div>
         </div>
 
         <div class="tool-wrap" data-tip-wrap>
@@ -491,13 +474,22 @@ PDF создаётся из текущего результата.
           <button id="undoBtn" type="button" disabled>Undo</button>
           <div class="tool-tip">Undo one editing step.</div>
         </div>
+        <div class="tool-wrap" data-tip-wrap>
+  <button id="redoBtn" type="button" disabled>Redo</button>
+  <div class="tool-tip">Redo one Apply step.</div>
+</div> 
       </div>
 
       <div class="right-tools">
 
         <div class="tool-wrap" data-tip-wrap>
           <button id="applyBtn" type="button">Apply</button>
-          <div class="tool-tip">Apply current effect and make it the new editor image.</div>
+          <div class="tool-tip">Build Result from current Editor settings.</div>
+        </div>
+
+        <div class="tool-wrap" data-tip-wrap>
+          <button id="useAsSourceBtn" type="button" disabled>Use as source</button>
+          <div class="tool-tip">Load Result back into Editor as the new source image.</div>
         </div>
 
         <div class="tool-wrap" data-tip-wrap>
@@ -530,6 +522,37 @@ PDF создаётся из текущего результата.
             <option value="portrait">Portrait 3:4</option>
           </select>
         </div>
+      </div>
+    </div>
+
+    <!-- Панель Resize видна только при активном режиме Resize -->
+    <div id="resizePanel" class="mode-panel">
+      <div class="crop-grid">
+
+        <div class="field">
+          <label for="resizeWidth">Width (px)</label>
+          <input id="resizeWidth" type="number" min="1" step="1" value="800">
+        </div>
+
+        <div class="field">
+          <label for="resizeHeight">Height (px)</label>
+          <input id="resizeHeight" type="number" min="1" step="1" value="800">
+        </div>
+
+        <div class="field">
+          <label for="keepAspect">Keep aspect ratio</label>
+          <select id="keepAspect">
+            <option value="yes" selected>Yes</option>
+            <option value="no">No, stretch / squeeze</option>
+          </select>
+        </div>
+
+      </div>
+
+      <div class="note">
+Resize changes the real output dimensions.
+With aspect ratio ON, Height follows Width and Width follows Height.
+With aspect ratio OFF, Width and Height are independent.
       </div>
     </div>
 
@@ -566,9 +589,11 @@ PDF создаётся из текущего результата.
 
     <div class="note">
 Crop: activate the button and select a rectangle.
-Resize: activate the button, click to set center, use wheel or pinch to zoom, drag when zoomed.
+Zoom: activate the button, click to set center, use wheel or pinch to zoom, drag when zoomed.
+Resize: set final Width and Height, with or without aspect ratio.
 Color: activate the button and adjust sliders.
-Apply: makes the result the new editor image and also shows it on the right.
+Apply: builds Result from the current Editor settings.
+Use as source: loads Result back into Editor.
 Avatar: creates a round avatar and also loads it back into the editor.
 Format: affects Save to disk.
     </div>
@@ -586,6 +611,7 @@ Format: affects Save to disk.
     <div class="panel">
       <h3>Result</h3>
       <div class="preview-box">
+        <div id="resultPlaceholder" class="note">Press Apply to make Result</div>
         <img id="resultPreview" alt="Result">
       </div>
       <div class="info" id="resultInfo"></div>
@@ -618,15 +644,22 @@ let sourceImage = null;
 let imageNaturalWidth = 0;
 let imageNaturalHeight = 0;
 
-/* Активный режим: null | crop | resize | color */
+/* Активный режим: null | crop | zoom | resize | color */
 let activeMode = null;
 
 /*
   ИСТОРИЯ ПРАВОК
-  Сюда кладём предыдущее состояние перед Apply / Avatar
-*/
-const editHistory = [];
 
+      История Apply:
+      Undo / Redo ходят только по результатам,
+      созданным через Apply.
+      Если после Undo нажали Apply —
+      будущая ветка Redo отбрасывается.
+    */
+     
+const editHistory = [];
+let historyIndex = 0;
+   
 /*
   СОСТОЯНИЕ CROP
 */
@@ -644,6 +677,20 @@ let resizeView = {
   centerX: 0,
   centerY: 0,
   zoom: 1
+};
+
+/*
+  СОСТОЯНИЕ РЕАЛЬНОГО RESIZE
+  width / height — итоговые размеры файла в пикселях.
+  keepAspect управляет автоматическим пересчётом сторон.
+*/
+let imageAspectRatio = 1;
+let isSyncingResizeFields = false;
+
+const outputResize = {
+  width: 800,
+  height: 800,
+  keepAspect: true
 };
 
 let isPanningResize = false;
@@ -675,9 +722,6 @@ DOM-ЭЛЕМЕНТЫ
 const photoInput = document.getElementById("photoInput");
 const cropModeSelect = document.getElementById("cropMode");
 const qualityInput = document.getElementById("quality");
-const photoSize = document.getElementById("photoSize");
-const photoSizeValue = document.getElementById("photoSizeValue");
-
 /* Новый выбор формата */
 const outputFormat = document.getElementById("outputFormat");
 
@@ -688,18 +732,26 @@ const pdfOrientation = document.getElementById("pdfOrientation");
 const pdfMargin = document.getElementById("pdfMargin");
 
 const cropModeBtn = document.getElementById("cropModeBtn");
+const zoomModeBtn = document.getElementById("zoomModeBtn");
 const resizeModeBtn = document.getElementById("resizeModeBtn");
 const colorModeBtn = document.getElementById("colorModeBtn");
 
 const backToOriginalBtn = document.getElementById("backToOriginalBtn");
 const undoBtn = document.getElementById("undoBtn");
+const redoBtn = document.getElementById("redoBtn");   
 const applyBtn = document.getElementById("applyBtn");
+const useAsSourceBtn = document.getElementById("useAsSourceBtn");
 const makeAvatarBtn = document.getElementById("makeAvatarBtn");
 const downloadBtn = document.getElementById("downloadBtn");
 /* Кнопка сохранения всегда активна */
 downloadBtn.disabled = false;
 const cropPanel = document.getElementById("cropPanel");
+const resizePanel = document.getElementById("resizePanel");
 const colorPanel = document.getElementById("colorPanel");
+
+const resizeWidth = document.getElementById("resizeWidth");
+const resizeHeight = document.getElementById("resizeHeight");
+const keepAspect = document.getElementById("keepAspect");
 
 const brightnessRange = document.getElementById("brightnessRange");
 const saturationRange = document.getElementById("saturationRange");
@@ -714,6 +766,7 @@ const temperatureValue = document.getElementById("temperatureValue");
 const editCanvas = document.getElementById("editCanvas");
 const editCtx = editCanvas.getContext("2d");
 
+const resultPlaceholder = document.getElementById("resultPlaceholder");
 const resultPreview = document.getElementById("resultPreview");
 const originalInfo = document.getElementById("originalInfo");
 const resultInfo = document.getElementById("resultInfo");
@@ -751,16 +804,6 @@ document.addEventListener("click", () => {
 
 /*
 ================================
-СЛАЙДЕР РАЗМЕРА 400–1200
-================================
-*/
-
-photoSize.addEventListener("input", () => {
-  photoSizeValue.textContent = photoSize.value + " px";
-});
-
-/*
-================================
 ПЕРЕКЛЮЧЕНИЕ БЛОКА PDF
 ================================
 */
@@ -782,43 +825,91 @@ updateFormatUI();
 
 photoInput.addEventListener("change", async (event) => {
   clearStatus();
-  resetResult();
-  clearHistory();
 
-  const file = event.target.files[0] || null;
+  const file =
+    event.target.files && event.target.files[0]
+      ? event.target.files[0]
+      : null;
 
   if (!file) {
-    clearCanvas();
-    originalInfo.textContent = "";
+    finishFileInput();
     return;
   }
 
   if (!file.type.startsWith("image/")) {
     setStatus("image file required");
+    finishFileInput();
     return;
   }
 
   try {
-    originalFile = file;
-    sourceFile = file;
+    resetResult();
 
-    await loadSourceFileIntoEditor(sourceFile);
+    originalFile =
+      file;
+
+    sourceFile =
+      file;
+
+editHistory.length = 0;
+
+editHistory.push(file);
+
+historyIndex = 0;
+     
+    await loadSourceFileIntoEditor(
+      sourceFile
+    );
 
     resetAllEditingState();
-    activeMode = null;
+
+    activeMode =
+      null;
+
     updateModeUI();
+
     drawEditor();
+
     updateHistoryButtons();
 
-downloadBtn.disabled = false;
-     
-    backToOriginalBtn.disabled = false;
-    setStatus("file loaded OK");
+    downloadBtn.disabled =
+      false;
+
+    backToOriginalBtn.disabled =
+      false;
+
+    setStatus(
+      "file loaded OK"
+    );
+
   } catch (error) {
-    setStatus("ERROR" + error.message);
+    setStatus(
+      "ERROR " +
+      (error.message || error)
+    );
+
+  } finally {
+    finishFileInput();
   }
 });
 
+/*
+================================
+ЗАВЕРШЕНИЕ FILE INPUT
+================================
+*/
+
+function finishFileInput() {
+  /*
+    Это отдельное завершение загрузчика.
+    Оно выполняется только после того,
+    как обработчик change закончил работу.
+  */
+
+  photoInput.value =
+    "";
+}
+ 
 /*
 ================================
 ПЕРЕКЛЮЧЕНИЕ РЕЖИМОВ
@@ -826,6 +917,7 @@ downloadBtn.disabled = false;
 */
 
 cropModeBtn.addEventListener("click", () => toggleMode("crop"));
+zoomModeBtn.addEventListener("click", () => toggleMode("zoom"));
 resizeModeBtn.addEventListener("click", () => toggleMode("resize"));
 colorModeBtn.addEventListener("click", () => toggleMode("color"));
 
@@ -842,19 +934,83 @@ function toggleMode(mode) {
 
 function updateModeUI() {
   cropModeBtn.classList.toggle("active", activeMode === "crop");
+  zoomModeBtn.classList.toggle("active", activeMode === "zoom");
   resizeModeBtn.classList.toggle("active", activeMode === "resize");
   colorModeBtn.classList.toggle("active", activeMode === "color");
 
   cropPanel.classList.toggle("visible", activeMode === "crop");
+  resizePanel.classList.toggle("visible", activeMode === "resize");
   colorPanel.classList.toggle("visible", activeMode === "color");
 
   if (activeMode === "crop") {
     editCanvas.style.cursor = "crosshair";
-  } else if (activeMode === "resize") {
+  } else if (activeMode === "zoom") {
     editCanvas.style.cursor = isPanningResize ? "grabbing" : (resizeView.zoom > 1 ? "grab" : "pointer");
   } else {
     editCanvas.style.cursor = "default";
   }
+}
+
+/*
+================================
+УПРАВЛЕНИЕ РЕАЛЬНЫМ RESIZE
+================================
+*/
+
+resizeWidth.addEventListener("input", () => {
+  if (isSyncingResizeFields) return;
+
+  const width = Math.max(1, Math.round(Number(resizeWidth.value) || 1));
+  outputResize.width = width;
+
+  if (keepAspect.value === "yes" && imageAspectRatio > 0) {
+    isSyncingResizeFields = true;
+    outputResize.height = Math.max(1, Math.round(width / imageAspectRatio));
+    resizeHeight.value = outputResize.height;
+    isSyncingResizeFields = false;
+  }
+});
+
+resizeHeight.addEventListener("input", () => {
+  if (isSyncingResizeFields) return;
+
+  const height = Math.max(1, Math.round(Number(resizeHeight.value) || 1));
+  outputResize.height = height;
+
+  if (keepAspect.value === "yes" && imageAspectRatio > 0) {
+    isSyncingResizeFields = true;
+    outputResize.width = Math.max(1, Math.round(height * imageAspectRatio));
+    resizeWidth.value = outputResize.width;
+    isSyncingResizeFields = false;
+  }
+});
+
+keepAspect.addEventListener("change", () => {
+  outputResize.keepAspect = keepAspect.value === "yes";
+
+  if (outputResize.keepAspect && imageAspectRatio > 0) {
+    const width = Math.max(1, Math.round(Number(resizeWidth.value) || outputResize.width || 1));
+
+    outputResize.width = width;
+    outputResize.height = Math.max(1, Math.round(width / imageAspectRatio));
+
+    isSyncingResizeFields = true;
+    resizeWidth.value = outputResize.width;
+    resizeHeight.value = outputResize.height;
+    isSyncingResizeFields = false;
+  }
+});
+
+function syncResizeFieldsFromImage(width, height) {
+  imageAspectRatio = width / height;
+  outputResize.width = width;
+  outputResize.height = height;
+  outputResize.keepAspect = keepAspect.value === "yes";
+
+  isSyncingResizeFields = true;
+  resizeWidth.value = width;
+  resizeHeight.value = height;
+  isSyncingResizeFields = false;
 }
 
 /*
@@ -894,8 +1050,6 @@ applyBtn.addEventListener("click", async () => {
   try {
     clearStatus();
 
-    const currentFileBeforeApply = sourceFile;
-
     processedFile = await buildFinalFile(sourceFile, {
       useCrop: activeMode === "crop" && !!cropRect,
       cropRectCanvas: cropRect,
@@ -903,33 +1057,94 @@ applyBtn.addEventListener("click", async () => {
       canvasHeight: editCanvas.height,
       imageWidth: imageNaturalWidth,
       imageHeight: imageNaturalHeight,
-      useResize: activeMode === "resize" || resizeView.zoom > 1 || !isResizeDefault(),
+      useZoom: activeMode === "zoom" || resizeView.zoom > 1 || !isResizeDefault(),
       resizeView,
-      targetSize: Number(photoSize.value),
+      useOutputResize: activeMode === "resize",
+      targetWidth: Number(resizeWidth.value),
+      targetHeight: Number(resizeHeight.value),
       colorState,
       quality: Number(qualityInput.value) || 0.75
     });
 
-    /* Сохраняем предыдущий шаг в историю */
-    pushHistory(currentFileBeforeApply);
-
-    /* Показать справа */
     await showResult(processedFile);
 
-    /* И поставить результат обратно в Editor */
-    sourceFile = processedFile;
-    await loadSourceFileIntoEditor(sourceFile);
+    sourceFile =
+      processedFile;
 
-    /* После Apply сбрасываем инструменты */
+    pushHistory(sourceFile);
+
+    await loadSourceFileIntoEditor(
+      sourceFile
+    );
+
     resetAllEditingState();
-    activeMode = null;
+
+    activeMode =
+      null;
+
     updateModeUI();
+
     drawEditor();
+
     updateHistoryButtons();
 
-    setStatus("applied OK");
+    useAsSourceBtn.disabled =
+      false;
+
+    setStatus("Result is ready OK");
+
   } catch (error) {
-    setStatus("ERROR" + error.message);
+    setStatus(
+      "ERROR " +
+      (error.message || error)
+    );
+  }
+});
+   
+/*
+================================
+ИСПОЛЬЗОВАТЬ RESULT КАК SOURCE
+================================
+*/
+
+useAsSourceBtn.addEventListener("click", async () => {
+  if (!processedFile) {
+    setStatus("Press Apply to make Result");
+    return;
+  }
+
+  try {
+    clearStatus();
+
+    sourceFile =
+      processedFile;
+
+    pushHistory(
+      sourceFile
+    );
+
+    await loadSourceFileIntoEditor(
+      sourceFile
+    );
+
+    resetAllEditingState();
+
+    activeMode =
+      null;
+
+    updateModeUI();
+
+    drawEditor();
+
+    updateHistoryButtons();
+
+    setStatus("Result loaded as source OK");
+
+  } catch (error) {
+    setStatus(
+      "ERROR " +
+      (error.message || error)
+    );
   }
 });
 
@@ -962,7 +1177,7 @@ makeAvatarBtn.addEventListener("click", async () => {
       canvasHeight: editCanvas.height,
       imageWidth: imageNaturalWidth,
       imageHeight: imageNaturalHeight,
-      targetSize: Number(photoSize.value),
+      targetSize: Number(resizeWidth.value) || 800,
       colorState,
       quality: Number(qualityInput.value) || 0.75
     });
@@ -987,36 +1202,99 @@ makeAvatarBtn.addEventListener("click", async () => {
 });
 
 /*
+/*
 ================================
-ОТМЕНИТЬ ПРАВКУ
+ОТМЕНИТЬ ПРАВКУ UNDO
 ================================
 */
 
 undoBtn.addEventListener("click", async () => {
-  if (editHistory.length === 0) {
-    setStatus("there is no previous edit");
+  if (historyIndex <= 0)
     return;
-  }
 
   try {
     clearStatus();
 
-    const previousFile = editHistory.pop();
-    sourceFile = previousFile;
+    historyIndex--;
 
-    await loadSourceFileIntoEditor(sourceFile);
+    sourceFile =
+      editHistory[historyIndex];
+
+    await loadSourceFileIntoEditor(
+      sourceFile
+    );
+
     resetAllEditingState();
-    activeMode = null;
+
+    activeMode =
+      null;
+
     updateModeUI();
+
     drawEditor();
+
     updateHistoryButtons();
 
-    setStatus("Undo one step OK");
+    setStatus(
+      "Undo OK"
+    );
+
   } catch (error) {
-    setStatus("ERROR" + error.message);
+    setStatus(
+      "ERROR " +
+      (error.message || error)
+    );
   }
 });
 
+/*
+================================
+ВЕРНУТЬ ПРАВКУ REDO
+================================
+*/
+
+redoBtn.addEventListener("click", async () => {
+  if (
+    historyIndex >=
+    editHistory.length - 1
+  )
+    return;
+
+  try {
+    clearStatus();
+
+    historyIndex++;
+
+    sourceFile =
+      editHistory[historyIndex];
+
+    await loadSourceFileIntoEditor(
+      sourceFile
+    );
+
+    resetAllEditingState();
+
+    activeMode =
+      null;
+
+    updateModeUI();
+
+    drawEditor();
+
+    updateHistoryButtons();
+
+    setStatus(
+      "Redo OK"
+    );
+
+  } catch (error) {
+    setStatus(
+      "ERROR " +
+      (error.message || error)
+    );
+  }
+});
+   
 /*
 ================================
 ВЕРНУТЬСЯ К ИСХОДНИКУ
@@ -1059,42 +1337,17 @@ document
   .addEventListener("click", async () => {
 
     /*
-      Сохраняем:
-      1) готовый результат, если он уже есть
-      2) иначе — текущий файл редактора
+      По новой логике Save сохраняет только Result.
+      Если Result ещё не создан — просим нажать Apply.
     */
-    const fileToSave = processedFile || sourceFile;
-
-    if (!fileToSave) {
-      setStatus("ERROR: no file to save");
+    if (!processedFile) {
+      setStatus("Press Apply to make Result");
       return;
     }
 
     try {
       const format = outputFormat.value;
-
-      /*
-        Для экспорта берём:
-        - processedFile, если он уже готов
-        - иначе сначала собираем текущий вид в webp
-      */
-      let exportFile = fileToSave;
-
-      if (!processedFile) {
-        exportFile = await buildFinalFile(fileToSave, {
-          useCrop: activeMode === "crop" && !!cropRect,
-          cropRectCanvas: cropRect,
-          canvasWidth: editCanvas.width,
-          canvasHeight: editCanvas.height,
-          imageWidth: imageNaturalWidth,
-          imageHeight: imageNaturalHeight,
-          useResize: activeMode === "resize" || resizeView.zoom > 1 || !isResizeDefault(),
-          resizeView,
-          targetSize: Number(photoSize.value),
-          colorState,
-          quality: Number(qualityInput.value) || 0.75
-        });
-      }
+      const exportFile = processedFile;
 
       /*
         WEBP
@@ -1210,18 +1463,42 @@ document
 */
 
 function pushHistory(file) {
+  if (!file)
+    return;
+
+  /*
+    Если после Undo сделали новый Apply,
+    отрезаем всё, что было впереди.
+  */
+  editHistory.splice(historyIndex + 1);
+
   editHistory.push(file);
+
+  historyIndex =
+    editHistory.length - 1;
+
+  updateHistoryButtons();
 }
 
 function clearHistory() {
   editHistory.length = 0;
+
+  historyIndex = 0;
+
+  updateHistoryButtons();
 }
 
 function updateHistoryButtons() {
-  undoBtn.disabled = editHistory.length === 0;
-  backToOriginalBtn.disabled = !originalFile;
-}
+  undoBtn.disabled =
+    historyIndex <= 0;
 
+  redoBtn.disabled =
+    historyIndex >= editHistory.length - 1;
+
+  backToOriginalBtn.disabled =
+    !originalFile;
+}
+   
 /*
 ================================
 ЗАГРУЗИТЬ ФАЙЛ В EDITOR
@@ -1235,26 +1512,22 @@ async function loadSourceFileIntoEditor(file) {
   sourceImage = img;
   imageNaturalWidth = img.width;
   imageNaturalHeight = img.height;
+  syncResizeFieldsFromImage(img.width, img.height);
 
-  const maxCanvasWidth = 540;
-  const maxCanvasHeight = 720;
-
-  const scale = Math.min(
-    maxCanvasWidth / img.width,
-    maxCanvasHeight / img.height,
-    1
-  );
-
-  editCanvas.width = Math.round(img.width * scale);
-  editCanvas.height = Math.round(img.height * scale);
+  /*
+  Canvas всегда равен реальному размеру изображения.
+  Масштабирование на экране делает только CSS max-width.
+*/
+editCanvas.width = img.width;
+editCanvas.height = img.height;
+   
   editCanvas.style.display = "block";
 
   originalInfo.textContent =
-    "Name: " + file.name + "\n" +
-    "Type: " + file.type + "\n" +
-    "Size: " + formatSize(file.size) + "\n" +
-    "Resolution: " + img.width + " × " + img.height + "\n" +
-    "Canvas: " + editCanvas.width + " × " + editCanvas.height;
+  "File name: " + file.name + "\n" +
+  "Format: " + file.name.split(".").pop().toUpperCase() + "\n" +
+  "File size: " + formatSize(file.size) + "\n" +
+  "Image size: " + img.width + " × " + img.height + " px";
 }
 
 /*
@@ -1346,7 +1619,7 @@ function drawEditor() {
 
   editCtx.clearRect(0, 0, editCanvas.width, editCanvas.height);
 
-  if (activeMode === "resize") {
+  if (activeMode === "zoom") {
     drawResizeEditor();
   } else {
     drawNormalEditor();
@@ -1517,8 +1790,10 @@ async function buildFinalFile(file, options = {}) {
     canvasHeight,
     imageWidth,
     imageHeight,
-    useResize,
-    targetSize = 800,
+    useZoom,
+    useOutputResize,
+    targetWidth,
+    targetHeight,
     colorState,
     quality = 0.8
   } = options;
@@ -1531,7 +1806,7 @@ async function buildFinalFile(file, options = {}) {
   let srcW = imageWidth;
   let srcH = imageHeight;
 
-  if (useResize) {
+  if (useZoom) {
     const rect = getResizeSourceRect();
     srcX = Math.round(rect.srcX);
     srcY = Math.round(rect.srcY);
@@ -1552,18 +1827,24 @@ async function buildFinalFile(file, options = {}) {
   srcW = clamp(srcW, 1, imageWidth - srcX);
   srcH = clamp(srcH, 1, imageHeight - srcY);
 
-  const scale = Math.min(
-    targetSize / srcW,
-    targetSize / srcH,
-    1
-  );
+  let finalWidth;
+  let finalHeight;
 
-  const targetWidth = Math.round(srcW * scale);
-  const targetHeight = Math.round(srcH * scale);
+  if (useOutputResize) {
+    finalWidth = Math.max(1, Math.round(Number(targetWidth) || srcW));
+    finalHeight = Math.max(1, Math.round(Number(targetHeight) || srcH));
+  } else {
+    /*
+      Crop / Zoom / Color не меняют размер файла.
+      Реальный размер меняет только отдельный режим Resize.
+    */
+    finalWidth = srcW;
+    finalHeight = srcH;
+  }
 
   const outCanvas = document.createElement("canvas");
-  outCanvas.width = targetWidth;
-  outCanvas.height = targetHeight;
+  outCanvas.width = finalWidth;
+  outCanvas.height = finalHeight;
 
   const outCtx = outCanvas.getContext("2d");
   if (!outCtx) throw new Error("Canvas context unavailable.");
@@ -1573,13 +1854,13 @@ async function buildFinalFile(file, options = {}) {
   outCtx.drawImage(
     image,
     srcX, srcY, srcW, srcH,
-    0, 0, targetWidth, targetHeight
+    0, 0, finalWidth, finalHeight
   );
 
   outCtx.filter = "none";
 
   if (colorState.temperature !== 0) {
-    applyTemperatureOverlay(outCtx, targetWidth, targetHeight, colorState.temperature);
+    applyTemperatureOverlay(outCtx, finalWidth, finalHeight, colorState.temperature);
   }
 
   const blob = await canvasToBlob(outCanvas, "image/webp", quality);
@@ -1702,6 +1983,7 @@ async function showResult(file) {
   processedObjectUrl = URL.createObjectURL(file);
   resultPreview.src = processedObjectUrl;
   resultPreview.style.display = "block";
+  resultPlaceholder.style.display = "none";
 
   const meta = await getImageMetaFromObjectUrl(processedObjectUrl);
 
@@ -1711,11 +1993,10 @@ async function showResult(file) {
     : "0";
 
   resultInfo.textContent =
-    "Name: " + file.name + "\n" +
-    "Type: " + file.type + "\n" +
-    "Size: " + formatSize(file.size) + "\n" +
-    "Resolution: " + meta.width + " × " + meta.height + "\n" +
-    "Saved: " + savedPercent + "%";
+    "File name: " + file.name + "\n" +
+  "Format: " + file.name.split(".").pop().toUpperCase() + "\n" +
+  "File size: " + formatSize(file.size) + "\n" +
+  "Image size: " + meta.width + " × " + meta.height + " px";
 }
 
 /*
@@ -1752,7 +2033,7 @@ editCanvas.addEventListener("mousemove", (event) => {
     drawEditor();
   }
 
-  if (activeMode === "resize" && isPanningResize) {
+  if (activeMode === "zoom" && isPanningResize) {
     const pos = getMousePosOnCanvas(event);
     panResizeView(pos.x, pos.y);
     drawEditor();
@@ -1768,7 +2049,7 @@ window.addEventListener("mouseup", () => {
     drawEditor();
   }
 
-  if (activeMode === "resize" && isPanningResize) {
+  if (activeMode === "zoom" && isPanningResize) {
     isPanningResize = false;
     updateModeUI();
   }
@@ -1781,7 +2062,7 @@ window.addEventListener("mouseup", () => {
 */
 
 editCanvas.addEventListener("click", (event) => {
-  if (!sourceImage || activeMode !== "resize") return;
+  if (!sourceImage || activeMode !== "zoom") return;
 
   if (suppressResizeClick) {
     suppressResizeClick = false;
@@ -1794,7 +2075,7 @@ editCanvas.addEventListener("click", (event) => {
 });
 
 editCanvas.addEventListener("mousedown", (event) => {
-  if (!sourceImage || activeMode !== "resize") return;
+  if (!sourceImage || activeMode !== "zoom") return;
   if (resizeView.zoom <= 1) return;
 
   const pos = getMousePosOnCanvas(event);
@@ -1810,7 +2091,7 @@ editCanvas.addEventListener("mousedown", (event) => {
 });
 
 editCanvas.addEventListener("wheel", (event) => {
-  if (!sourceImage || activeMode !== "resize") return;
+  if (!sourceImage || activeMode !== "zoom") return;
 
   event.preventDefault();
 
@@ -1868,7 +2149,7 @@ editCanvas.addEventListener("touchstart", (event) => {
     return;
   }
 
-  if (activeMode === "resize") {
+  if (activeMode === "zoom") {
     if (event.touches.length === 1) {
       event.preventDefault();
 
@@ -1909,7 +2190,7 @@ editCanvas.addEventListener("touchmove", (event) => {
     return;
   }
 
-  if (activeMode === "resize") {
+  if (activeMode === "zoom") {
     if (event.touches.length === 1 && isPanningResize && resizeView.zoom > 1) {
       event.preventDefault();
 
@@ -1941,7 +2222,7 @@ window.addEventListener("touchend", (event) => {
     drawEditor();
   }
 
-  if (activeMode === "resize") {
+  if (activeMode === "zoom") {
     if (!event.touches || event.touches.length < 2) {
       pinchStartDistance = null;
     }
@@ -2346,7 +2627,9 @@ function resetResult() {
   processedFile = null;
   resultPreview.src = "";
   resultPreview.style.display = "none";
+  resultPlaceholder.style.display = "block";
   resultInfo.textContent = "";
+  useAsSourceBtn.disabled = true;
   
    /*
     Кнопку Save to disk НЕ выключаем.
@@ -2368,7 +2651,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-save button | v2.2.0
+Apply\Edit cleaning | v3.2.0
   </div>
 
   <div class="row" id="build-down">
