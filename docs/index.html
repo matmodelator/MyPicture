@@ -425,6 +425,24 @@ button.active {
         <input id="photoInput" type="file" accept="image/*">
       </div>
 
+<div class="field">
+  <label for="folderInput">Folder</label>
+  <input
+    id="folderInput"
+    type="file"
+    webkitdirectory
+    multiple
+    accept="image/*">
+</div>
+
+<div class="field">
+  <label>Browse</label>
+  <div>
+    <button type="button" id="prevFolderPhotoBtn" disabled>Prev</button>
+    <button type="button" id="nextFolderPhotoBtn" disabled>Next</button>
+  </div>
+</div>
+       
       <!-- Качество -->
       <div class="field">
         <label for="quality">Quality</label>
@@ -682,6 +700,10 @@ Format: affects Save to disk.
 /* Текущий файл редактора */
 let sourceFile = null;
 
+/* СОСТОЯНИЕ ПРОСМОТРА ПАПКИ */
+let folderFiles = [];
+let folderIndex = -1;
+   
 /* Самый первый загруженный файл */
 let originalFile = null;
 
@@ -777,6 +799,8 @@ const folderInput = document.getElementById("folderInput");
 const folderBrowser = document.getElementById("folderBrowser");
 const folderList = document.getElementById("folderList");
 const folderThumbs = document.getElementById("folderThumbs");
+const prevFolderPhotoBtn = document.getElementById("prevFolderPhotoBtn");
+const nextFolderPhotoBtn = document.getElementById("nextFolderPhotoBtn");   
    
 const cropModeSelect = document.getElementById("cropMode");
 const qualityInput = document.getElementById("quality");
@@ -960,17 +984,30 @@ historyIndex = 0;
 
 /*
 ================================
-ЗАГРУЗКА ПАПКИ В EDITOR
+ЗАГРУЗКА ПАПКИ В EDITOR с ЛИСТАНИЕМ
 ================================
 */
 
 folderInput.addEventListener("change", async () => {
   clearStatus();
 
-  const files = Array.from(folderInput.files || [])
-    .filter(file => file.type.startsWith("image/"));
+  folderFiles = Array.from(folderInput.files || [])
+    .filter(file => file.type.startsWith("image/"))
+    .sort((a, b) => {
+      const pathA = a.webkitRelativePath || a.name;
+      const pathB = b.webkitRelativePath || b.name;
 
-  if (!files.length) {
+      return pathA.localeCompare(pathB);
+    });
+
+  if (!folderFiles.length) {
+    folderIndex = -1;
+    updateFolderNavButtons();
+
+    folderBrowser.classList.remove("visible");
+    folderList.textContent = "";
+    folderThumbs.innerHTML = "";
+
     setStatus("No images found");
     return;
   }
@@ -978,58 +1015,145 @@ folderInput.addEventListener("change", async () => {
   folderBrowser.classList.add("visible");
 
   folderList.textContent =
-    "Images found: " + files.length;
+    "Images found: " + folderFiles.length;
 
+  renderFolderThumbs();
+
+  folderIndex = 0;
+
+  await loadFolderFileByIndex(folderIndex);
+});
+
+prevFolderPhotoBtn.addEventListener("click", async () => {
+  if (
+    !folderFiles.length ||
+    folderIndex <= 0
+  ) {
+    return;
+  }
+
+  folderIndex--;
+
+  await loadFolderFileByIndex(folderIndex);
+});
+
+nextFolderPhotoBtn.addEventListener("click", async () => {
+  if (
+    !folderFiles.length ||
+    folderIndex >= folderFiles.length - 1
+  ) {
+    return;
+  }
+
+  folderIndex++;
+
+  await loadFolderFileByIndex(folderIndex);
+});
+
+function renderFolderThumbs() {
   folderThumbs.innerHTML = "";
 
-  files.forEach((file) => {
+  folderFiles.forEach((file, index) => {
     const url = URL.createObjectURL(file);
 
     const card = document.createElement("div");
-    card.className = "gallery-card";
+
+    card.className =
+      "gallery-card" +
+      (index === folderIndex ? " active" : "");
 
     card.innerHTML =
       `<img src="${url}" alt="">` +
       `<div>${file.webkitRelativePath || file.name}</div>`;
 
     card.addEventListener("click", async () => {
-      try {
-        clearStatus();
+      folderIndex = index;
 
-        resetResult();
-
-        originalFile = file;
-        sourceFile = file;
-
-        editHistory.length = 0;
-        editHistory.push(file);
-        historyIndex = 0;
-
-        await loadSourceFileIntoEditor(sourceFile);
-
-        resetAllEditingState();
-
-        activeMode = null;
-
-        updateModeUI();
-
-        drawEditor();
-
-        updateHistoryButtons();
-
-        downloadBtn.disabled = false;
-        backToOriginalBtn.disabled = false;
-
-        setStatus("file loaded from folder OK");
-
-      } catch (error) {
-        setStatus("ERROR " + (error.message || error));
-      }
+      await loadFolderFileByIndex(folderIndex);
     });
 
     folderThumbs.appendChild(card);
   });
-});
+}
+
+async function loadFolderFileByIndex(index) {
+  const file = folderFiles[index];
+
+  if (!file) {
+    return;
+  }
+
+  try {
+    clearStatus();
+
+    resetResult();
+
+    originalFile = file;
+    sourceFile = file;
+
+    editHistory.length = 0;
+    editHistory.push(file);
+    historyIndex = 0;
+
+    await loadSourceFileIntoEditor(sourceFile);
+
+    resetAllEditingState();
+
+    activeMode = null;
+
+    updateModeUI();
+
+    drawEditor();
+
+    updateHistoryButtons();
+
+    downloadBtn.disabled = false;
+    backToOriginalBtn.disabled = false;
+
+    updateFolderNavButtons();
+    updateActiveFolderThumb();
+
+    const path =
+      file.webkitRelativePath || file.name;
+
+    setStatus(
+      "folder file loaded OK\n" +
+      (folderIndex + 1) +
+      " / " +
+      folderFiles.length +
+      "\n" +
+      path
+    );
+
+  } catch (error) {
+    setStatus(
+      "ERROR " +
+      (error.message || error)
+    );
+  }
+}
+
+function updateFolderNavButtons() {
+  prevFolderPhotoBtn.disabled =
+    !folderFiles.length ||
+    folderIndex <= 0;
+
+  nextFolderPhotoBtn.disabled =
+    !folderFiles.length ||
+    folderIndex >= folderFiles.length - 1;
+}
+
+function updateActiveFolderThumb() {
+  const cards =
+    folderThumbs.querySelectorAll(".gallery-card");
+
+  cards.forEach((card, index) => {
+    card.classList.toggle(
+      "active",
+      index === folderIndex
+    );
+  });
+}
    
 /*
 ================================
@@ -2932,7 +3056,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-Просмотр папок | v5.0.0
+Просмотр папок с листанием | v5.1.0
   </div>
 
   <div class="row" id="build-down">
