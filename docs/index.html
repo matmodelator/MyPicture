@@ -249,6 +249,43 @@ button.active {
   font-size: 11px;
   word-break: break-all;
 }
+
+.gallery-card {
+  position: relative;
+}
+
+.gallery-card.removed {
+  opacity: 0.35;
+  filter: grayscale(100%);
+}
+
+.gallery-hover {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.72);
+  color: white;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-weight: bold;
+  font-size: 14px;
+
+  opacity: 0;
+  transition: opacity .15s;
+  border-radius: 8px;
+}
+
+.gallery-card:hover .gallery-hover {
+  opacity: 1;
+}
+
+.folder-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+}
    
 /* ========================================
    ТЕКСТ СТАТУСА
@@ -653,6 +690,12 @@ With aspect ratio OFF, Width and Height are independent.
 <div id="folderBrowser" class="mode-panel">
   <div id="folderList" class="note"></div>
   <div id="folderThumbs" class="gallery-grid"></div>
+
+   <div class="folder-actions">
+  <button type="button" id="clearRemovedBtn" disabled>Clear removed</button>
+  <button type="button" id="clearAllBtn" disabled>Clear all</button>
+</div>
+   
 </div>
      
     <div class="status" id="status"></div>
@@ -799,6 +842,8 @@ const folderInput = document.getElementById("folderInput");
 const folderBrowser = document.getElementById("folderBrowser");
 const folderList = document.getElementById("folderList");
 const folderThumbs = document.getElementById("folderThumbs");
+const clearRemovedBtn = document.getElementById("clearRemovedBtn");
+const clearAllBtn = document.getElementById("clearAllBtn");   
 const prevFolderPhotoBtn = document.getElementById("prevFolderPhotoBtn");
 const nextFolderPhotoBtn = document.getElementById("nextFolderPhotoBtn");   
    
@@ -984,7 +1029,7 @@ historyIndex = 0;
 
 /*
 ================================
-ЗАГРУЗКА ПАПКИ В EDITOR с ЛИСТАНИЕМ
+ЗАГРУЗКА ПАПКИ В EDITOR с ЛИСТИНГОМ и ПРЕВЬЮ
 ================================
 */
 
@@ -996,92 +1041,153 @@ folderInput.addEventListener("change", async () => {
     .sort((a, b) => {
       const pathA = a.webkitRelativePath || a.name;
       const pathB = b.webkitRelativePath || b.name;
-
       return pathA.localeCompare(pathB);
-    });
+    })
+    .map(file => ({
+      file,
+      removed: false
+    }));
 
   if (!folderFiles.length) {
     folderIndex = -1;
-    updateFolderNavButtons();
-
-    folderBrowser.classList.remove("visible");
-    folderList.textContent = "";
-    folderThumbs.innerHTML = "";
-
+    clearFolderView();
     setStatus("No images found");
     return;
   }
 
   folderBrowser.classList.add("visible");
 
-  folderList.textContent =
-    "Images found: " + folderFiles.length;
+  folderIndex = 0;
 
   renderFolderThumbs();
-
-  folderIndex = 0;
 
   await loadFolderFileByIndex(folderIndex);
 });
 
 prevFolderPhotoBtn.addEventListener("click", async () => {
-  if (
-    !folderFiles.length ||
-    folderIndex <= 0
-  ) {
-    return;
-  }
+  const prevIndex = findPrevActiveIndex(folderIndex);
 
-  folderIndex--;
+  if (prevIndex === -1)
+    return;
+
+  folderIndex = prevIndex;
 
   await loadFolderFileByIndex(folderIndex);
 });
 
 nextFolderPhotoBtn.addEventListener("click", async () => {
-  if (
-    !folderFiles.length ||
-    folderIndex >= folderFiles.length - 1
-  ) {
+  const nextIndex = findNextActiveIndex(folderIndex);
+
+  if (nextIndex === -1)
+    return;
+
+  folderIndex = nextIndex;
+
+  await loadFolderFileByIndex(folderIndex);
+});
+
+clearRemovedBtn.addEventListener("click", async () => {
+  folderFiles = folderFiles.filter(item => !item.removed);
+
+  if (!folderFiles.length) {
+    folderIndex = -1;
+    clearFolderView();
+    setStatus("list is empty");
     return;
   }
 
-  folderIndex++;
+  if (folderIndex >= folderFiles.length) {
+    folderIndex = folderFiles.length - 1;
+  }
+
+  if (folderFiles[folderIndex].removed) {
+    folderIndex = findNextActiveIndex(-1);
+  }
+
+  renderFolderThumbs();
 
   await loadFolderFileByIndex(folderIndex);
+});
+
+clearAllBtn.addEventListener("click", () => {
+  folderFiles = [];
+  folderIndex = -1;
+
+  clearFolderView();
+
+  resetResult();
+  clearCanvas();
+
+  originalFile = null;
+  sourceFile = null;
+
+  editHistory.length = 0;
+  historyIndex = 0;
+
+  updateHistoryButtons();
+
+  setStatus("folder list cleared OK");
 });
 
 function renderFolderThumbs() {
   folderThumbs.innerHTML = "";
 
-  folderFiles.forEach((file, index) => {
+  folderFiles.forEach((item, index) => {
+    const file = item.file;
     const url = URL.createObjectURL(file);
 
     const card = document.createElement("div");
 
     card.className =
       "gallery-card" +
-      (index === folderIndex ? " active" : "");
+      (index === folderIndex ? " active" : "") +
+      (item.removed ? " removed" : "");
 
     card.innerHTML =
       `<img src="${url}" alt="">` +
-      `<div>${file.webkitRelativePath || file.name}</div>`;
+      `<div>${file.webkitRelativePath || file.name}</div>` +
+      `<div class="gallery-hover">${item.removed ? "Restore" : "Remove"}</div>`;
 
     card.addEventListener("click", async () => {
-      folderIndex = index;
+      item.removed = !item.removed;
 
-      await loadFolderFileByIndex(folderIndex);
+      if (
+        item.removed &&
+        index === folderIndex
+      ) {
+        const nextIndex =
+          findNextActiveIndex(index) !== -1
+            ? findNextActiveIndex(index)
+            : findPrevActiveIndex(index);
+
+        folderIndex = nextIndex;
+      }
+
+      renderFolderThumbs();
+
+      if (folderIndex !== -1) {
+        await loadFolderFileByIndex(folderIndex);
+      } else {
+        updateFolderNavButtons();
+        updateFolderInfo();
+        setStatus("all files marked as removed");
+      }
     });
 
     folderThumbs.appendChild(card);
   });
+
+  updateFolderInfo();
+  updateFolderNavButtons();
 }
 
 async function loadFolderFileByIndex(index) {
-  const file = folderFiles[index];
+  const item = folderFiles[index];
 
-  if (!file) {
+  if (!item || item.removed)
     return;
-  }
+
+  const file = item.file;
 
   try {
     clearStatus();
@@ -1110,8 +1216,9 @@ async function loadFolderFileByIndex(index) {
     downloadBtn.disabled = false;
     backToOriginalBtn.disabled = false;
 
-    updateFolderNavButtons();
     updateActiveFolderThumb();
+    updateFolderNavButtons();
+    updateFolderInfo();
 
     const path =
       file.webkitRelativePath || file.name;
@@ -1133,14 +1240,40 @@ async function loadFolderFileByIndex(index) {
   }
 }
 
+function findPrevActiveIndex(fromIndex) {
+  for (let i = fromIndex - 1; i >= 0; i--) {
+    if (!folderFiles[i].removed) {
+      return i;
+    }
+  }
+
+  return -1;
+}
+
+function findNextActiveIndex(fromIndex) {
+  for (let i = fromIndex + 1; i < folderFiles.length; i++) {
+    if (!folderFiles[i].removed) {
+      return i;
+    }
+  }
+
+  return -1;
+}
+
 function updateFolderNavButtons() {
   prevFolderPhotoBtn.disabled =
-    !folderFiles.length ||
-    folderIndex <= 0;
+    folderIndex === -1 ||
+    findPrevActiveIndex(folderIndex) === -1;
 
   nextFolderPhotoBtn.disabled =
-    !folderFiles.length ||
-    folderIndex >= folderFiles.length - 1;
+    folderIndex === -1 ||
+    findNextActiveIndex(folderIndex) === -1;
+
+  clearRemovedBtn.disabled =
+    !folderFiles.some(item => item.removed);
+
+  clearAllBtn.disabled =
+    !folderFiles.length;
 }
 
 function updateActiveFolderThumb() {
@@ -1152,7 +1285,52 @@ function updateActiveFolderThumb() {
       "active",
       index === folderIndex
     );
+
+    card.classList.toggle(
+      "removed",
+      folderFiles[index] &&
+      folderFiles[index].removed
+    );
+
+    const hover =
+      card.querySelector(".gallery-hover");
+
+    if (hover) {
+      hover.textContent =
+        folderFiles[index].removed
+          ? "Restore"
+          : "Remove";
+    }
   });
+}
+
+function updateFolderInfo() {
+  const removedCount =
+    folderFiles.filter(item => item.removed).length;
+
+  const activeCount =
+    folderFiles.length - removedCount;
+
+  folderList.textContent =
+    "Images: " +
+    folderFiles.length +
+    " | Active: " +
+    activeCount +
+    " | Removed: " +
+    removedCount;
+}
+
+function clearFolderView() {
+  folderBrowser.classList.remove("visible");
+
+  folderList.textContent = "";
+  folderThumbs.innerHTML = "";
+
+  prevFolderPhotoBtn.disabled = true;
+  nextFolderPhotoBtn.disabled = true;
+
+  clearRemovedBtn.disabled = true;
+  clearAllBtn.disabled = true;
 }
    
 /*
@@ -3056,7 +3234,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-Просмотр папок с листанием | v5.1.0
+Просмотр папок с ЛИСТИНГОМ и ПРЕВЬЮ| v5.2.0
   </div>
 
   <div class="row" id="build-down">
