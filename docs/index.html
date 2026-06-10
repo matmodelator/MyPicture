@@ -215,6 +215,42 @@ button.active {
 }
 
 /* ========================================
+   FOLDER BROWSER
+======================================== */
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.gallery-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px;
+  cursor: pointer;
+}
+
+.gallery-card:hover {
+  background: #e0e7ff;
+}
+
+.gallery-card img {
+  width: 100%;
+  height: 90px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.gallery-card div {
+  margin-top: 4px;
+  font-size: 11px;
+  word-break: break-all;
+}
+   
+/* ========================================
    ТЕКСТ СТАТУСА
 ======================================== */
 
@@ -432,6 +468,11 @@ button.active {
           <input id="pdfMargin" type="number" value="10" min="0" max="50" step="1">
         </div>
 
+<div class="field">
+  <label for="folderInput">Folder</label>
+  <input id="folderInput" type="file" webkitdirectory multiple accept="image/*">
+</div>
+         
       </div>
 
       <div class="note">
@@ -591,6 +632,11 @@ With aspect ratio OFF, Width and Height are independent.
       </div>
     </div>
 
+<div id="folderBrowser" class="mode-panel">
+  <div id="folderList" class="note"></div>
+  <div id="folderThumbs" class="gallery-grid"></div>
+</div>
+     
     <div class="status" id="status"></div>
 
     <div class="note">
@@ -726,6 +772,12 @@ DOM-ЭЛЕМЕНТЫ
 */
 
 const photoInput = document.getElementById("photoInput");
+
+const folderInput = document.getElementById("folderInput");
+const folderBrowser = document.getElementById("folderBrowser");
+const folderList = document.getElementById("folderList");
+const folderThumbs = document.getElementById("folderThumbs");
+   
 const cropModeSelect = document.getElementById("cropMode");
 const qualityInput = document.getElementById("quality");
 /* Новый выбор формата */
@@ -906,6 +958,79 @@ historyIndex = 0;
   }
 });
 
+/*
+================================
+ЗАГРУЗКА ПАПКИ В EDITOR
+================================
+*/
+
+folderInput.addEventListener("change", async () => {
+  clearStatus();
+
+  const files = Array.from(folderInput.files || [])
+    .filter(file => file.type.startsWith("image/"));
+
+  if (!files.length) {
+    setStatus("No images found");
+    return;
+  }
+
+  folderBrowser.classList.add("visible");
+
+  folderList.textContent =
+    "Images found: " + files.length;
+
+  folderThumbs.innerHTML = "";
+
+  files.forEach((file) => {
+    const url = URL.createObjectURL(file);
+
+    const card = document.createElement("div");
+    card.className = "gallery-card";
+
+    card.innerHTML =
+      `<img src="${url}" alt="">` +
+      `<div>${file.webkitRelativePath || file.name}</div>`;
+
+    card.addEventListener("click", async () => {
+      try {
+        clearStatus();
+
+        resetResult();
+
+        originalFile = file;
+        sourceFile = file;
+
+        editHistory.length = 0;
+        editHistory.push(file);
+        historyIndex = 0;
+
+        await loadSourceFileIntoEditor(sourceFile);
+
+        resetAllEditingState();
+
+        activeMode = null;
+
+        updateModeUI();
+
+        drawEditor();
+
+        updateHistoryButtons();
+
+        downloadBtn.disabled = false;
+        backToOriginalBtn.disabled = false;
+
+        setStatus("file loaded from folder OK");
+
+      } catch (error) {
+        setStatus("ERROR " + (error.message || error));
+      }
+    });
+
+    folderThumbs.appendChild(card);
+  });
+});
+   
 /*
 ================================
 ЗАВЕРШЕНИЕ FILE INPUT
@@ -2807,7 +2932,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-Send & Print instead of UpLoad | v4.0.1
+Просмотр папок | v5.0.0
   </div>
 
   <div class="row" id="build-down">
