@@ -243,9 +243,14 @@ button.active {
   background: #dbeafe;
 }
 
-.gallery-card.removed {
-  opacity: 0.35;
+/* Удалённая карточка */
+.gallery-card.removed img {
+  opacity: 0.25;
   filter: grayscale(100%);
+}
+
+.gallery-card.removed div {
+  opacity: 0.5;
 }
 
 .gallery-card img {
@@ -261,6 +266,8 @@ button.active {
   word-break: break-all;
 }
 
+/* Remove / Restore */
+
 .gallery-remove {
   position: absolute;
 
@@ -268,7 +275,7 @@ button.active {
   right: 4px;
 
   border: none;
-  background: transparent;
+  background: transparent !important;
 
   padding: 0;
   margin: 0;
@@ -279,15 +286,26 @@ button.active {
   font-weight: bold;
   line-height: 1;
 
-  z-index: 10;
+  z-index: 20;
+
+  outline: none;
+  box-shadow: none;
+}
+
+.gallery-remove:hover,
+.gallery-remove:focus,
+.gallery-remove:active {
+  background: transparent !important;
+  outline: none;
+  box-shadow: none;
 }
 
 .gallery-card:not(.removed) .gallery-remove {
-  color: #dc2626;
+  color: #dc2626 !important;
 }
 
 .gallery-card.removed .gallery-remove {
-  color: #16a34a;
+  color: #16a34a !important;
 }
 
 .folder-actions {
@@ -3260,7 +3278,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-Крестики - нолики без подложки| v5.3.3
+Крестики - нолики без ебаной хуйни всякой| v5.3.4
   </div>
 
   <div class="row" id="build-down">
