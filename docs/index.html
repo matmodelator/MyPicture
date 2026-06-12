@@ -226,6 +226,7 @@ button.active {
 }
 
 .gallery-card {
+  position: relative;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
@@ -235,6 +236,16 @@ button.active {
 
 .gallery-card:hover {
   background: #e0e7ff;
+}
+
+.gallery-card.active {
+  border-color: #2563eb;
+  background: #dbeafe;
+}
+
+.gallery-card.removed {
+  opacity: 0.35;
+  filter: grayscale(100%);
 }
 
 .gallery-card img {
@@ -250,35 +261,33 @@ button.active {
   word-break: break-all;
 }
 
-.gallery-card {
-  position: relative;
-}
-
-.gallery-card.removed {
-  opacity: 0.35;
-  filter: grayscale(100%);
-}
-
-.gallery-hover {
+.gallery-remove {
   position: absolute;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.72);
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(220, 38, 38, 0.92);
   color: white;
-
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-
+  font-size: 16px;
   font-weight: bold;
-  font-size: 14px;
-
   opacity: 0;
-  transition: opacity .15s;
-  border-radius: 8px;
+  transition: opacity 0.15s;
+  z-index: 10;
 }
 
-.gallery-card:hover .gallery-hover {
+.gallery-card:hover .gallery-remove {
   opacity: 1;
+}
+
+.gallery-card.removed .gallery-remove {
+  background: rgba(22, 163, 74, 0.92);
 }
 
 .folder-actions {
@@ -1130,9 +1139,11 @@ clearAllBtn.addEventListener("click", () => {
 });
 
 function renderFolderThumbs() {
+
   folderThumbs.innerHTML = "";
 
   folderFiles.forEach((item, index) => {
+
     const file = item.file;
     const url = URL.createObjectURL(file);
 
@@ -1144,37 +1155,52 @@ function renderFolderThumbs() {
       (item.removed ? " removed" : "");
 
     card.innerHTML =
+      `<button
+          type="button"
+          class="gallery-remove"
+          title="${item.removed ? "Restore" : "Remove"}"
+        >
+          ${item.removed ? "↺" : "×"}
+       </button>` +
       `<img src="${url}" alt="">` +
-      `<div>${file.webkitRelativePath || file.name}</div>` +
-      `<div class="gallery-hover">${item.removed ? "Restore" : "Remove"}</div>`;
+      `<div>${file.webkitRelativePath || file.name}</div>`;
 
-    card.addEventListener("click", async () => {
+    const removeBtn =
+      card.querySelector(".gallery-remove");
+
+    removeBtn.addEventListener("click", (event) => {
+
+      event.stopPropagation();
+
       item.removed = !item.removed;
 
-      if (
-        item.removed &&
-        index === folderIndex
-      ) {
-        const nextIndex =
-          findNextActiveIndex(index) !== -1
-            ? findNextActiveIndex(index)
-            : findPrevActiveIndex(index);
+      card.classList.toggle(
+        "removed",
+        item.removed
+      );
 
-        folderIndex = nextIndex;
-      }
+      removeBtn.textContent =
+        item.removed ? "↺" : "×";
 
-      renderFolderThumbs();
+      removeBtn.title =
+        item.removed ? "Restore" : "Remove";
 
-      if (folderIndex !== -1) {
-        await loadFolderFileByIndex(folderIndex);
-      } else {
-        updateFolderNavButtons();
-        updateFolderInfo();
-        setStatus("all files marked as removed");
-      }
+      updateFolderInfo();
+      updateFolderNavButtons();
+    });
+
+    card.addEventListener("click", async () => {
+
+      if (item.removed)
+        return;
+
+      folderIndex = index;
+
+      await loadFolderFileByIndex(folderIndex);
     });
 
     folderThumbs.appendChild(card);
+
   });
 
   updateFolderInfo();
@@ -3234,7 +3260,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-Просмотр папок с ЛИСТИНГОМ и ПРЕВЬЮ| v5.2.0
+Крестики - нолики| v5.3.0
   </div>
 
   <div class="row" id="build-down">
