@@ -189,6 +189,42 @@ button:disabled {
   color: #16a34a !important;
 }
 
+.gallery-left,
+.gallery-right {
+  position: absolute;
+
+  bottom: 2px;
+
+  border: none;
+  background: transparent !important;
+
+  padding: 0;
+  margin: 0;
+
+  cursor: pointer;
+
+  font-size: 18px;
+  font-weight: bold;
+
+  z-index: 20;
+
+  color: #2563eb;
+}
+
+.gallery-left {
+  left: 6px;
+}
+
+.gallery-right {
+  right: 6px;
+}
+
+.gallery-left:hover,
+.gallery-right:hover {
+  color: #1d4ed8;
+}
+
+  
 .preview-box {
   margin-top: 18px;
   background: #e5e7eb;
@@ -955,12 +991,49 @@ h1, h2 {
   }
 });
 
+ 
 /*
 ================================
 GALLERY
 ================================
 */
 
+function moveFolderItem(from, to) {
+
+  if (
+    to < 0 ||
+    to >= folderItems.length
+  ) {
+    return;
+  }
+
+  const item =
+    folderItems.splice(from, 1)[0];
+
+  folderItems.splice(
+    to,
+    0,
+    item
+  );
+
+  if (currentIndex === from) {
+    currentIndex = to;
+  } else if (
+    currentIndex > from &&
+    currentIndex <= to
+  ) {
+    currentIndex--;
+  } else if (
+    currentIndex < from &&
+    currentIndex >= to
+  ) {
+    currentIndex++;
+  }
+
+  renderGallery();
+}
+  
+ 
 function renderGallery() {
   galleryGrid.innerHTML = "";
 
@@ -981,11 +1054,29 @@ function renderGallery() {
           title="${item.removed ? "Restore to list" : "Remove from list"}"
         >
           ${item.removed ? "↺" : "×"}
+       </button>
+
+       <button
+          type="button"
+          class="gallery-left"
+          title="Move left"
+        >
+          ←
+       </button>
+
+       <button
+          type="button"
+          class="gallery-right"
+          title="Move right"
+        >
+          →
        </button>` +
       `<img src="${url}" alt="">` +
       `<div class="file-name">${escapeHtml(item.path)}</div>`;
 
     const removeBtn = card.querySelector(".gallery-remove");
+    const leftBtn = card.querySelector(".gallery-left");
+    const rightBtn = card.querySelector(".gallery-right");
 
     removeBtn.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -1003,6 +1094,18 @@ function renderGallery() {
       updateInfo();
     });
 
+    leftBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+
+      moveFolderItem(index, index - 1);
+    });
+
+    rightBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+
+      moveFolderItem(index, index + 1);
+    });
+
     card.addEventListener("click", async () => {
       if (item.removed) return;
 
@@ -1017,6 +1120,40 @@ function renderGallery() {
   updateInfo();
 }
 
+function moveFolderItem(from, to) {
+  if (
+    to < 0 ||
+    to >= folderItems.length
+  ) {
+    return;
+  }
+
+  const item =
+    folderItems.splice(from, 1)[0];
+
+  folderItems.splice(
+    to,
+    0,
+    item
+  );
+
+  if (currentIndex === from) {
+    currentIndex = to;
+  } else if (
+    currentIndex > from &&
+    currentIndex <= to
+  ) {
+    currentIndex--;
+  } else if (
+    currentIndex < from &&
+    currentIndex >= to
+  ) {
+    currentIndex++;
+  }
+
+  renderGallery();
+}
+  
 async function loadCurrentImage() {
   const item = folderItems[currentIndex];
 
@@ -1485,7 +1622,7 @@ function escapeXml(text) {
 <div id="service-console">
 
   <div class="row" id="build-top">
-load fix | v1.1.1
+пятнашки со стрелочками | v2.0.0
   </div>
 
   <div class="row" id="build-down">
