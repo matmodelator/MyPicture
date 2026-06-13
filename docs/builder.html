@@ -61,7 +61,11 @@ select {
 
 .delay-wrap {
   position: relative;
-  display: inline-block;
+  display: block;
+}
+
+.delay-wrap input {
+  width: 100%;
 }
 
 .delay-wrap::after {
@@ -347,8 +351,6 @@ const musicInput = document.getElementById("musicInput");
 const slideDelay = document.getElementById("slideDelay");
 
 const fitMusicCheckbox = document.getElementById("fitMusicCheckbox");
-
-let manualSlideDelay = 4;
 
 slideDelay.addEventListener("input", () => {
 
@@ -1274,10 +1276,10 @@ function updateInfo() {
   const active = total - removed;
 
   let slideSeconds =
-    Math.max(
-      1,
-      Number(slideDelay.value) || 4
-    );
+  Math.max(
+    1,
+    manualSlideDelay || 4
+  );
 
   if (
     fitMusicCheckbox.checked &&
@@ -1760,7 +1762,7 @@ function escapeXml(text) {
 <div id="service-console">
 
   <div class="row" id="build-top">
-блядь delay\fit | v2.1.3
+fix сука!!!! delay\fit | v2.1.4
   </div>
 
   <div class="row" id="build-down">
