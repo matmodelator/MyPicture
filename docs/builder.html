@@ -125,6 +125,7 @@ button:disabled {
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 6px;
+  padding-bottom: 28px;
   cursor: pointer;
 }
 
@@ -282,6 +283,14 @@ button:disabled {
     <div class="field">
       <label for="slideDelay">Delay sec</label>
       <input id="slideDelay" type="number" value="4" min="1" max="60" step="1">
+
+     <label>
+  <input
+    type="checkbox"
+    id="fitMusicCheckbox">
+  Fit Music
+</label> 
+      
     </div>
 
     <div class="field">
@@ -322,12 +331,21 @@ let folderItems = [];
 let currentIndex = -1;
 let currentObjectUrl = null;
 let musicFile = null;
+let musicDuration = 0;  
 
 const folderInput = document.getElementById("folderInput");
 const zipInput = document.getElementById("zipInput");
 const musicInput = document.getElementById("musicInput");
 const slideDelay = document.getElementById("slideDelay");
-
+slideDelay.addEventListener(
+  "input",
+  updateInfo
+);
+const fitMusicCheckbox = document.getElementById("fitMusicCheckbox");  
+fitMusicCheckbox.addEventListener(
+  "change",
+  updateInfo
+);
 const prevBtn = document.getElementById("prevBtn");
 const nextBtn = document.getElementById("nextBtn");
 
@@ -513,20 +531,54 @@ OPEN MUSIC
 ================================
 */
 
-musicInput.addEventListener("change", () => {
+musicInput.addEventListener("change", async () => {
+
   musicFile =
-    musicInput.files && musicInput.files[0]
+    musicInput.files &&
+    musicInput.files[0]
       ? musicInput.files[0]
       : null;
 
-  if (musicFile) {
+  if (!musicFile)
+    return;
+
+  try {
+
+    const audio =
+      new Audio(
+        URL.createObjectURL(
+          musicFile
+        )
+      );
+
+    await new Promise(resolve => {
+      audio.onloadedmetadata =
+        resolve;
+    });
+
+    musicDuration =
+      audio.duration || 0;
+updateInfo();
+    
     setStatus(
       "music loaded OK\n" +
-      musicFile.name,
+      musicFile.name +
+      "\n" +
+      Math.round(musicDuration) +
+      " sec",
       "ok"
     );
+
+  } catch {
+
+    musicDuration = 0;
+
+  } finally {
+
+    musicInput.value = "";
+
   }
- musicInput.value = ""; 
+
 });
 
 /* ================================ 
@@ -660,11 +712,21 @@ slideShowBtn.addEventListener("click", async () => {
     const name = prompt("Slideshow file name", "slideshow");
     if (!name) return;
 
-    const delaySeconds =
-      Math.max(
-        1,
-        Number(slideDelay.value) || 4
-      );
+    let delaySeconds =
+  Math.max(
+    1,
+    Number(slideDelay.value) || 4
+  );
+
+if (
+  fitMusicCheckbox.checked &&
+  musicDuration > 0 &&
+  activeItems.length > 0
+) {
+  delaySeconds =
+    musicDuration /
+    activeItems.length;
+}
 
     const slides = [];
 
@@ -1186,10 +1248,54 @@ function updateInfo() {
   const removed = folderItems.filter(item => item.removed).length;
   const active = total - removed;
 
+  let slideSeconds =
+    Math.max(
+      1,
+      Number(slideDelay.value) || 4
+    );
+
+  if (
+    fitMusicCheckbox.checked &&
+    musicDuration > 0 &&
+    active > 0
+  ) {
+    slideSeconds =
+      musicDuration / active;
+  }
+
+  let musicText = "";
+
+  if (
+    musicFile &&
+    musicDuration > 0
+  ) {
+    const musicMinutes =
+      Math.floor(musicDuration / 60);
+
+    const musicSeconds =
+      Math.floor(musicDuration % 60);
+
+    musicText =
+      "\nMusic: " +
+      musicFile.name +
+      " (" +
+      String(musicMinutes).padStart(2, "0") +
+      ":" +
+      String(musicSeconds).padStart(2, "0") +
+      ")";
+  }
+
+  const slideText =
+    "\nSlide: " +
+    slideSeconds.toFixed(1) +
+    " sec";
+
   folderInfo.textContent =
     "Images: " + total +
     " | Active: " + active +
     " | Removed: " + removed +
+    musicText +
+    slideText +
     (currentIndex >= 0 && folderItems[currentIndex]
       ? "\nCurrent: " + (currentIndex + 1) + " / " + total + "\n" + folderItems[currentIndex].path
       : "");
@@ -1622,7 +1728,7 @@ function escapeXml(text) {
 <div id="service-console">
 
   <div class="row" id="build-top">
-пятнашки со стрелочками | v2.0.0
+music duration\ delay\fit | v2.1.0
   </div>
 
   <div class="row" id="build-down">
