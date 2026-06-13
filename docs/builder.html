@@ -241,9 +241,6 @@ button:disabled {
     <div class="field">
       <label for="musicInput">Music</label>
       <input id="musicInput" type="file" accept="audio/*">
-      <div class="rights-note">
-        Use only audio files you have the right to use and distribute.
-      </div>
     </div>
 
     <div class="field">
@@ -321,32 +318,53 @@ OPEN FOLDER
 */
 
 folderInput.addEventListener("change", async () => {
-  const files = Array.from(folderInput.files || [])
-    .filter(file => file.type.startsWith("image/"))
-    .sort((a, b) => {
-      const pathA = a.webkitRelativePath || a.name;
-      const pathB = b.webkitRelativePath || b.name;
-      return pathA.localeCompare(pathB);
-    });
 
-  if (!files.length) {
-    clearAll();
-    setStatus("No images found", "error");
-    return;
+  try {
+
+    const files = Array.from(folderInput.files || [])
+      .filter(file => file.type.startsWith("image/"))
+      .sort((a, b) => {
+        const pathA = a.webkitRelativePath || a.name;
+        const pathB = b.webkitRelativePath || b.name;
+
+        return pathA.localeCompare(pathB);
+      });
+
+    if (!files.length) {
+      clearAll();
+      setStatus("No images found", "error");
+      return;
+    }
+
+    folderItems = files.map(file => ({
+      file,
+      name: file.name,
+      path: file.webkitRelativePath || file.name,
+      removed: false
+    }));
+
+    currentIndex = 0;
+
+    renderGallery();
+
+    await loadCurrentImage();
+
+    setStatus("folder loaded OK", "ok");
+
+  } catch (error) {
+
+    setStatus(
+      "ERROR: " +
+      (error.message || error),
+      "error"
+    );
+
+  } finally {
+
+    folderInput.value = "";
+
   }
 
-  folderItems = files.map(file => ({
-    file,
-    name: file.name,
-    path: file.webkitRelativePath || file.name,
-    removed: false
-  }));
-
-  currentIndex = 0;
-
-  renderGallery();
-  await loadCurrentImage();
-  setStatus("folder loaded OK", "ok");
 });
 
 /*
@@ -356,13 +374,17 @@ OPEN ZIP
 */
 
 zipInput.addEventListener("change", async () => {
-  const file = zipInput.files && zipInput.files[0]
-    ? zipInput.files[0]
-    : null;
-
-  if (!file) return;
 
   try {
+
+    const file =
+      zipInput.files && zipInput.files[0]
+        ? zipInput.files[0]
+        : null;
+
+    if (!file)
+      return;
+
     clearStatus();
 
     if (!window.JSZip) {
@@ -370,16 +392,22 @@ zipInput.addEventListener("change", async () => {
       return;
     }
 
-    const zip = await JSZip.loadAsync(file);
+    const zip =
+      await JSZip.loadAsync(file);
 
     const entries = [];
 
     zip.forEach((path, entry) => {
-      if (entry.dir) return;
+      if (entry.dir)
+        return;
 
-      if (!/\.(jpg|jpeg|png|webp|gif)$/i.test(path)) return;
+      if (!/\.(jpg|jpeg|png|webp|gif)$/i.test(path))
+        return;
 
-      entries.push({ path, entry });
+      entries.push({
+        path,
+        entry
+      });
     });
 
     if (!entries.length) {
@@ -388,20 +416,28 @@ zipInput.addEventListener("change", async () => {
       return;
     }
 
-    entries.sort((a, b) => a.path.localeCompare(b.path));
+    entries.sort((a, b) =>
+      a.path.localeCompare(b.path)
+    );
 
     folderItems = [];
 
     for (const item of entries) {
-      const blob = await item.entry.async("blob");
 
-      const name = item.path.split("/").pop() || "image";
+      const blob =
+        await item.entry.async("blob");
 
-      const imageFile = new File(
-        [blob],
-        name,
-        { type: guessImageType(name) }
-      );
+      const name =
+        item.path.split("/").pop() || "image";
+
+      const imageFile =
+        new File(
+          [blob],
+          name,
+          {
+            type: guessImageType(name)
+          }
+        );
 
       folderItems.push({
         file: imageFile,
@@ -414,13 +450,25 @@ zipInput.addEventListener("change", async () => {
     currentIndex = 0;
 
     renderGallery();
+
     await loadCurrentImage();
 
     setStatus("ZIP loaded OK", "ok");
 
   } catch (error) {
-    setStatus("ERROR: " + (error.message || error), "error");
+
+    setStatus(
+      "ERROR: " +
+      (error.message || error),
+      "error"
+    );
+
+  } finally {
+
+    zipInput.value = "";
+
   }
+
 });
 
 /*
@@ -442,8 +490,19 @@ musicInput.addEventListener("change", () => {
       "ok"
     );
   }
+ musicInput.value = ""; 
 });
 
+/* ================================ 
+ЗАВЕРШЕНИЕ ЗАГРУЗЧИКОВ
+================================ */
+  
+function finishBuilderInputs() {
+  folderInput.value = "";
+  zipInput.value = "";
+  musicInput.value = "";
+}
+  
 /*
 ================================
 NAVIGATION
@@ -1426,7 +1485,7 @@ function escapeXml(text) {
 <div id="service-console">
 
   <div class="row" id="build-top">
-+ music | v1.1.0
+load fix | v1.1.1
   </div>
 
   <div class="row" id="build-down">
