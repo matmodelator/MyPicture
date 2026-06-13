@@ -1,0 +1,1778 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>MyPictures Builder</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 24px;
+  font-family: Arial, sans-serif;
+  background: #f4f6f8;
+}
+
+.container {
+  max-width: 1320px;
+  margin: 0 auto;
+  background: white;
+  padding: 24px;
+  border-radius: 12px;
+}
+
+h2 {
+  margin-top: 0;
+}
+
+.controls-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field label {
+  font-size: 14px;
+  color: #333;
+}
+
+input,
+select {
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+button {
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #1d4ed8;
+}
+
+button:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.status {
+  min-height: 24px;
+  white-space: pre-line;
+  color: #ca8a04;
+  margin-bottom: 14px;
+}
+
+.status.ok {
+  color: #15803d;
+}
+
+.status.error {
+  color: #b91c1c;
+}
+
+.info {
+  margin-bottom: 12px;
+  font-size: 14px;
+  color: #444;
+  white-space: pre-line;
+}
+
+.rights-note {
+  font-size: 12px;
+  color: #64748b;
+  max-width: 260px;
+  line-height: 1.3;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.gallery-card {
+  position: relative;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 6px;
+  padding-bottom: 28px;
+  cursor: pointer;
+}
+
+.gallery-card.active {
+  border-color: #2563eb;
+  background: #dbeafe;
+}
+
+.gallery-card.removed img {
+  opacity: 0.25;
+  filter: grayscale(100%);
+}
+
+.gallery-card.removed .file-name {
+  opacity: 0.5;
+}
+
+.gallery-card img {
+  width: 100%;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 6px;
+  display: block;
+}
+
+.file-name {
+  margin-top: 5px;
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.gallery-remove {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  border: none;
+  background: transparent !important;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  font-size: 22px;
+  font-weight: bold;
+  line-height: 1;
+  z-index: 20;
+  outline: none;
+  box-shadow: none;
+}
+
+.gallery-remove:hover,
+.gallery-remove:focus,
+.gallery-remove:active {
+  background: transparent !important;
+  outline: none;
+  box-shadow: none;
+}
+
+.gallery-card:not(.removed) .gallery-remove {
+  color: #dc2626 !important;
+}
+
+.gallery-card.removed .gallery-remove {
+  color: #16a34a !important;
+}
+
+.gallery-left,
+.gallery-right {
+  position: absolute;
+
+  bottom: 2px;
+
+  border: none;
+  background: transparent !important;
+
+  padding: 0;
+  margin: 0;
+
+  cursor: pointer;
+
+  font-size: 18px;
+  font-weight: bold;
+
+  z-index: 20;
+
+  color: #2563eb;
+}
+
+.gallery-left {
+  left: 6px;
+}
+
+.gallery-right {
+  right: 6px;
+}
+
+.gallery-left:hover,
+.gallery-right:hover {
+  color: #1d4ed8;
+}
+
+  
+.preview-box {
+  margin-top: 18px;
+  background: #e5e7eb;
+  min-height: 420px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#mainPreview {
+  max-width: 100%;
+  max-height: 640px;
+  display: none;
+}
+
+#service-console {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  padding: 6px 10px;
+  background: #111;
+  color: #8cff8c;
+  font-family: monospace;
+  font-size: 12px;
+  z-index: 9999;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <h2>MyPictures Builder</h2>
+
+  <div class="controls-row">
+
+    <div class="field">
+      <label for="folderInput">Folder</label>
+      <input id="folderInput" type="file" webkitdirectory multiple accept="image/*">
+    </div>
+
+    <div class="field">
+      <label for="zipInput">Open ZIP</label>
+      <input id="zipInput" type="file" accept=".zip,application/zip">
+    </div>
+
+    <div class="field">
+      <label for="musicInput">Music</label>
+      <input id="musicInput" type="file" accept="audio/*">
+    </div>
+
+    <div class="field">
+      <label for="slideDelay">Delay sec</label>
+      <input id="slideDelay" type="number" value="4" min="1" max="60" step="1">
+
+     <label>
+  <input
+    type="checkbox"
+    id="fitMusicCheckbox">
+  Fit Music
+</label> 
+      
+    </div>
+
+    <div class="field">
+      <label>Browse</label>
+      <div>
+        <button type="button" id="prevBtn" disabled>Prev</button>
+        <button type="button" id="nextBtn" disabled>Next</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="toolbar">
+    <button type="button" id="clearRemovedBtn" disabled>Clear removed</button>
+    <button type="button" id="clearAllBtn" disabled>Clear all</button>
+    <button type="button" id="zipBtn" disabled>ZIP</button>
+    <button type="button" id="slideShowBtn" disabled>Slide Show</button>
+    <button type="button" id="presentationBtn" disabled>Presentation</button>
+    <button type="button" id="pdfBookBtn" disabled>PDF Book</button>
+    <button type="button" id="epubBtn" disabled>EPUB</button>
+  </div>
+
+  <div id="status" class="status"></div>
+
+  <div id="folderInfo" class="info"></div>
+
+  <div id="galleryGrid" class="gallery-grid"></div>
+
+  <div class="preview-box">
+    <div id="previewPlaceholder">Choose folder or ZIP</div>
+    <img id="mainPreview" alt="Preview">
+  </div>
+
+</div>
+
+<script>
+let folderItems = [];
+let currentIndex = -1;
+let currentObjectUrl = null;
+let musicFile = null;
+let musicDuration = 0;  
+
+const folderInput = document.getElementById("folderInput");
+const zipInput = document.getElementById("zipInput");
+const musicInput = document.getElementById("musicInput");
+const slideDelay = document.getElementById("slideDelay");
+slideDelay.addEventListener(
+  "input",
+  updateInfo
+);
+const fitMusicCheckbox = document.getElementById("fitMusicCheckbox");  
+fitMusicCheckbox.addEventListener(
+  "change",
+  updateInfo
+);
+const prevBtn = document.getElementById("prevBtn");
+const nextBtn = document.getElementById("nextBtn");
+
+const clearRemovedBtn = document.getElementById("clearRemovedBtn");
+const clearAllBtn = document.getElementById("clearAllBtn");
+
+const zipBtn = document.getElementById("zipBtn");
+const slideShowBtn = document.getElementById("slideShowBtn");
+const presentationBtn = document.getElementById("presentationBtn");
+const pdfBookBtn = document.getElementById("pdfBookBtn");
+const epubBtn = document.getElementById("epubBtn");
+
+const galleryGrid = document.getElementById("galleryGrid");
+const folderInfo = document.getElementById("folderInfo");
+const statusBox = document.getElementById("status");
+
+const mainPreview = document.getElementById("mainPreview");
+const previewPlaceholder = document.getElementById("previewPlaceholder");
+
+/*
+================================
+OPEN FOLDER
+================================
+*/
+
+folderInput.addEventListener("change", async () => {
+
+  try {
+
+    const files = Array.from(folderInput.files || [])
+      .filter(file => file.type.startsWith("image/"))
+      .sort((a, b) => {
+        const pathA = a.webkitRelativePath || a.name;
+        const pathB = b.webkitRelativePath || b.name;
+
+        return pathA.localeCompare(pathB);
+      });
+
+    if (!files.length) {
+      clearAll();
+      setStatus("No images found", "error");
+      return;
+    }
+
+    folderItems = files.map(file => ({
+      file,
+      name: file.name,
+      path: file.webkitRelativePath || file.name,
+      removed: false
+    }));
+
+    currentIndex = 0;
+
+    renderGallery();
+
+    await loadCurrentImage();
+
+    setStatus("folder loaded OK", "ok");
+
+  } catch (error) {
+
+    setStatus(
+      "ERROR: " +
+      (error.message || error),
+      "error"
+    );
+
+  } finally {
+
+    folderInput.value = "";
+
+  }
+
+});
+
+/*
+================================
+OPEN ZIP
+================================
+*/
+
+zipInput.addEventListener("change", async () => {
+
+  try {
+
+    const file =
+      zipInput.files && zipInput.files[0]
+        ? zipInput.files[0]
+        : null;
+
+    if (!file)
+      return;
+
+    clearStatus();
+
+    if (!window.JSZip) {
+      setStatus("ERROR: JSZip not loaded", "error");
+      return;
+    }
+
+    const zip =
+      await JSZip.loadAsync(file);
+
+    const entries = [];
+
+    zip.forEach((path, entry) => {
+      if (entry.dir)
+        return;
+
+      if (!/\.(jpg|jpeg|png|webp|gif)$/i.test(path))
+        return;
+
+      entries.push({
+        path,
+        entry
+      });
+    });
+
+    if (!entries.length) {
+      clearAll();
+      setStatus("No images in ZIP", "error");
+      return;
+    }
+
+    entries.sort((a, b) =>
+      a.path.localeCompare(b.path)
+    );
+
+    folderItems = [];
+
+    for (const item of entries) {
+
+      const blob =
+        await item.entry.async("blob");
+
+      const name =
+        item.path.split("/").pop() || "image";
+
+      const imageFile =
+        new File(
+          [blob],
+          name,
+          {
+            type: guessImageType(name)
+          }
+        );
+
+      folderItems.push({
+        file: imageFile,
+        name,
+        path: item.path,
+        removed: false
+      });
+    }
+
+    currentIndex = 0;
+
+    renderGallery();
+
+    await loadCurrentImage();
+
+    setStatus("ZIP loaded OK", "ok");
+
+  } catch (error) {
+
+    setStatus(
+      "ERROR: " +
+      (error.message || error),
+      "error"
+    );
+
+  } finally {
+
+    zipInput.value = "";
+
+  }
+
+});
+
+/*
+================================
+OPEN MUSIC
+================================
+*/
+
+musicInput.addEventListener("change", async () => {
+
+  musicFile =
+    musicInput.files &&
+    musicInput.files[0]
+      ? musicInput.files[0]
+      : null;
+
+  if (!musicFile)
+    return;
+
+  try {
+
+    const audio =
+      new Audio(
+        URL.createObjectURL(
+          musicFile
+        )
+      );
+
+    await new Promise(resolve => {
+      audio.onloadedmetadata =
+        resolve;
+    });
+
+    musicDuration =
+      audio.duration || 0;
+updateInfo();
+    
+    setStatus(
+      "music loaded OK\n" +
+      musicFile.name +
+      "\n" +
+      Math.round(musicDuration) +
+      " sec",
+      "ok"
+    );
+
+  } catch {
+
+    musicDuration = 0;
+
+  } finally {
+
+    musicInput.value = "";
+
+  }
+
+});
+
+/* ================================ 
+ЗАВЕРШЕНИЕ ЗАГРУЗЧИКОВ
+================================ */
+  
+function finishBuilderInputs() {
+  folderInput.value = "";
+  zipInput.value = "";
+  musicInput.value = "";
+}
+  
+/*
+================================
+NAVIGATION
+================================
+*/
+
+prevBtn.addEventListener("click", async () => {
+  const index = findPrevActiveIndex(currentIndex);
+  if (index === -1) return;
+
+  currentIndex = index;
+  await loadCurrentImage();
+});
+
+nextBtn.addEventListener("click", async () => {
+  const index = findNextActiveIndex(currentIndex);
+  if (index === -1) return;
+
+  currentIndex = index;
+  await loadCurrentImage();
+});
+
+/*
+================================
+CLEAR
+================================
+*/
+
+clearRemovedBtn.addEventListener("click", async () => {
+  folderItems = folderItems.filter(item => !item.removed);
+
+  if (!folderItems.length) {
+    clearAll();
+    setStatus("list is empty", "error");
+    return;
+  }
+
+  if (currentIndex >= folderItems.length) {
+    currentIndex = folderItems.length - 1;
+  }
+
+  renderGallery();
+  await loadCurrentImage();
+});
+
+clearAllBtn.addEventListener("click", () => {
+  clearAll();
+  setStatus("builder cleared OK", "ok");
+});
+
+/*
+================================
+ZIP EXPORT
+================================
+*/
+
+zipBtn.addEventListener("click", async () => {
+  const activeItems = getActiveItems();
+
+  if (!activeItems.length) {
+    setStatus("ERROR: no active files to zip", "error");
+    return;
+  }
+
+  try {
+    const zipName = prompt("ZIP file name", "selected_photos");
+    if (!zipName) return;
+
+    const folderName = zipName.replace(/\.zip$/i, "");
+
+    const zip = new JSZip();
+
+    activeItems.forEach(item => {
+      zip.file(
+        folderName + "/" + item.name,
+        item.file
+      );
+    });
+
+    const blob = await zip.generateAsync({
+      type: "blob"
+    });
+
+    const zipFile = new File(
+      [blob],
+      zipName.endsWith(".zip") ? zipName : zipName + ".zip",
+      { type: "application/zip" }
+    );
+
+    downloadFile(zipFile);
+
+    setStatus(
+      "ZIP OK\n" +
+      activeItems.length + " files\n" +
+      zipFile.name,
+      "ok"
+    );
+
+  } catch (error) {
+    setStatus("ERROR: " + (error.message || error), "error");
+  }
+});
+
+/*
+================================
+SLIDE SHOW HTML
+================================
+*/
+
+slideShowBtn.addEventListener("click", async () => {
+  const activeItems = getActiveItems();
+
+  if (!activeItems.length) {
+    setStatus("ERROR: no active images", "error");
+    return;
+  }
+
+  try {
+    const name = prompt("Slideshow file name", "slideshow");
+    if (!name) return;
+
+    let delaySeconds =
+  Math.max(
+    1,
+    Number(slideDelay.value) || 4
+  );
+
+if (
+  fitMusicCheckbox.checked &&
+  musicDuration > 0 &&
+  activeItems.length > 0
+) {
+  delaySeconds =
+    musicDuration /
+    activeItems.length;
+}
+
+    const slides = [];
+
+    for (const item of activeItems) {
+      const dataUrl = await readFileAsDataURL(item.file);
+
+      slides.push({
+        name: escapeHtml(item.name),
+        dataUrl
+      });
+    }
+
+    let musicDataUrl = "";
+
+    if (musicFile) {
+      musicDataUrl =
+        await readFileAsDataURL(musicFile);
+    }
+
+    const html =
+      buildSlideshowHtml(
+        slides,
+        {
+          musicDataUrl,
+          delaySeconds
+        }
+      );
+
+    const file = new File(
+      [html],
+      name.endsWith(".html") ? name : name + ".html",
+      { type: "text/html" }
+    );
+
+    downloadFile(file);
+
+    setStatus("Slide Show OK", "ok");
+
+  } catch (error) {
+    setStatus("ERROR: " + (error.message || error), "error");
+  }
+});
+
+/*
+================================
+PRESENTATION HTML
+================================
+*/
+
+presentationBtn.addEventListener("click", async () => {
+  const activeItems = getActiveItems();
+
+  if (!activeItems.length) {
+    setStatus("ERROR: no active images", "error");
+    return;
+  }
+
+  try {
+    const title = prompt("Presentation title", "My Presentation");
+    if (!title) return;
+
+    const slides = [];
+
+    for (const item of activeItems) {
+      const dataUrl = await readFileAsDataURL(item.file);
+      slides.push({
+        title: escapeHtml(item.name),
+        dataUrl
+      });
+    }
+
+    const html = buildPresentationHtml(title, slides);
+
+    const file = new File(
+      [html],
+      title + ".html",
+      { type: "text/html" }
+    );
+
+    downloadFile(file);
+
+    setStatus("Presentation OK", "ok");
+
+  } catch (error) {
+    setStatus("ERROR: " + (error.message || error), "error");
+  }
+});
+
+/*
+================================
+PDF BOOK
+================================
+*/
+
+pdfBookBtn.addEventListener("click", async () => {
+  const activeItems = getActiveItems();
+
+  if (!activeItems.length) {
+    setStatus("ERROR: no active images", "error");
+    return;
+  }
+
+  try {
+    const bookName = prompt("PDF book name", "photo_book");
+    if (!bookName) return;
+
+    const { jsPDF } = window.jspdf;
+
+    const doc = new jsPDF({
+      orientation: "landscape",
+      unit: "mm",
+      format: "a4"
+    });
+
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+
+    doc.setFontSize(28);
+    doc.text(bookName, pageW / 2, pageH / 2, { align: "center" });
+
+    for (const item of activeItems) {
+      const dataUrl = await readFileAsDataURL(item.file);
+      const img = await loadImage(dataUrl);
+
+      doc.addPage();
+
+      const margin = 12;
+      const maxW = pageW - margin * 2;
+      const maxH = pageH - margin * 2 - 10;
+
+      const ratio = img.width / img.height;
+
+      let w = maxW;
+      let h = w / ratio;
+
+      if (h > maxH) {
+        h = maxH;
+        w = h * ratio;
+      }
+
+      const x = (pageW - w) / 2;
+      const y = margin;
+
+      doc.addImage(dataUrl, getPdfImageType(item.name), x, y, w, h);
+
+      doc.setFontSize(10);
+      doc.text(item.name, pageW / 2, pageH - 8, { align: "center" });
+    }
+
+    const blob = doc.output("blob");
+
+    const file = new File(
+      [blob],
+      bookName.endsWith(".pdf") ? bookName : bookName + ".pdf",
+      { type: "application/pdf" }
+    );
+
+    downloadFile(file);
+
+    setStatus("PDF Book OK", "ok");
+
+  } catch (error) {
+    setStatus("ERROR: " + (error.message || error), "error");
+  }
+});
+
+/*
+================================
+EPUB
+================================
+*/
+
+epubBtn.addEventListener("click", async () => {
+  const activeItems = getActiveItems();
+
+  if (!activeItems.length) {
+    setStatus("ERROR: no active images", "error");
+    return;
+  }
+
+  try {
+    const bookTitle = prompt("EPUB title", "photo_book");
+    if (!bookTitle) return;
+
+    const epub = new JSZip();
+
+    epub.file("mimetype", "application/epub+zip", {
+      compression: "STORE"
+    });
+
+    epub.folder("META-INF").file(
+      "container.xml",
+      `<?xml version="1.0" encoding="UTF-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>`
+    );
+
+    const oebps = epub.folder("OEBPS");
+    const imagesFolder = oebps.folder("images");
+
+    let manifestItems = "";
+    let spineItems = "";
+    let navList = "";
+
+    const chapterFiles = [];
+
+    for (let i = 0; i < activeItems.length; i++) {
+      const item = activeItems[i];
+
+      const ext = getExtension(item.name) || "jpg";
+      const imageName = "image_" + String(i + 1).padStart(3, "0") + "." + ext;
+      const chapterName = "chapter_" + String(i + 1).padStart(3, "0") + ".xhtml";
+      const itemId = "chap" + (i + 1);
+      const imgId = "img" + (i + 1);
+
+      imagesFolder.file(imageName, item.file);
+
+      const chapter =
+`<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <title>${escapeXml(item.name)}</title>
+  <link rel="stylesheet" href="style.css" type="text/css"/>
+</head>
+<body>
+  <section class="page">
+    <h2>${escapeXml(item.name)}</h2>
+    <img src="images/${imageName}" alt="${escapeXml(item.name)}"/>
+  </section>
+</body>
+</html>`;
+
+      oebps.file(chapterName, chapter);
+
+      chapterFiles.push(chapterName);
+
+      manifestItems += `<item id="${itemId}" href="${chapterName}" media-type="application/xhtml+xml"/>\n`;
+      manifestItems += `<item id="${imgId}" href="images/${imageName}" media-type="${guessImageType(imageName)}"/>\n`;
+      spineItems += `<itemref idref="${itemId}"/>\n`;
+
+      navList += `<li><a href="${chapterName}">${escapeXml(item.name)}</a></li>\n`;
+    }
+
+    oebps.file(
+      "style.css",
+`body {
+  font-family: sans-serif;
+  margin: 0;
+  padding: 0;
+}
+.page {
+  text-align: center;
+  padding: 1em;
+}
+img {
+  max-width: 100%;
+  height: auto;
+}
+h1, h2 {
+  text-align: center;
+}`
+    );
+
+    oebps.file(
+      "nav.xhtml",
+`<?xml version="1.0" encoding="UTF-8"?>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head>
+  <title>${escapeXml(bookTitle)}</title>
+</head>
+<body>
+  <nav epub:type="toc">
+    <h1>${escapeXml(bookTitle)}</h1>
+    <ol>
+      ${navList}
+    </ol>
+  </nav>
+</body>
+</html>`
+    );
+
+    const uid = "urn:uuid:" + crypto.randomUUID();
+
+    oebps.file(
+      "content.opf",
+`<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="bookid">${uid}</dc:identifier>
+    <dc:title>${escapeXml(bookTitle)}</dc:title>
+    <dc:language>en</dc:language>
+  </metadata>
+  <manifest>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="css" href="style.css" media-type="text/css"/>
+    ${manifestItems}
+  </manifest>
+  <spine>
+    ${spineItems}
+  </spine>
+</package>`
+    );
+
+    const blob = await epub.generateAsync({
+      type: "blob",
+      mimeType: "application/epub+zip"
+    });
+
+    const file = new File(
+      [blob],
+      bookTitle.endsWith(".epub") ? bookTitle : bookTitle + ".epub",
+      { type: "application/epub+zip" }
+    );
+
+    downloadFile(file);
+
+    setStatus("EPUB OK", "ok");
+
+  } catch (error) {
+    setStatus("ERROR: " + (error.message || error), "error");
+  }
+});
+
+ 
+/*
+================================
+GALLERY
+================================
+*/
+
+function moveFolderItem(from, to) {
+
+  if (
+    to < 0 ||
+    to >= folderItems.length
+  ) {
+    return;
+  }
+
+  const item =
+    folderItems.splice(from, 1)[0];
+
+  folderItems.splice(
+    to,
+    0,
+    item
+  );
+
+  if (currentIndex === from) {
+    currentIndex = to;
+  } else if (
+    currentIndex > from &&
+    currentIndex <= to
+  ) {
+    currentIndex--;
+  } else if (
+    currentIndex < from &&
+    currentIndex >= to
+  ) {
+    currentIndex++;
+  }
+
+  renderGallery();
+}
+  
+ 
+function renderGallery() {
+  galleryGrid.innerHTML = "";
+
+  folderItems.forEach((item, index) => {
+    const url = URL.createObjectURL(item.file);
+
+    const card = document.createElement("div");
+
+    card.className =
+      "gallery-card" +
+      (index === currentIndex ? " active" : "") +
+      (item.removed ? " removed" : "");
+
+    card.innerHTML =
+      `<button
+          type="button"
+          class="gallery-remove"
+          title="${item.removed ? "Restore to list" : "Remove from list"}"
+        >
+          ${item.removed ? "↺" : "×"}
+       </button>
+
+       <button
+          type="button"
+          class="gallery-left"
+          title="Move left"
+        >
+          ←
+       </button>
+
+       <button
+          type="button"
+          class="gallery-right"
+          title="Move right"
+        >
+          →
+       </button>` +
+      `<img src="${url}" alt="">` +
+      `<div class="file-name">${escapeHtml(item.path)}</div>`;
+
+    const removeBtn = card.querySelector(".gallery-remove");
+    const leftBtn = card.querySelector(".gallery-left");
+    const rightBtn = card.querySelector(".gallery-right");
+
+    removeBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+
+      item.removed = !item.removed;
+
+      card.classList.toggle("removed", item.removed);
+
+      removeBtn.textContent = item.removed ? "↺" : "×";
+
+      removeBtn.title = item.removed
+        ? "Restore to list"
+        : "Remove from list";
+
+      updateInfo();
+    });
+
+    leftBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+
+      moveFolderItem(index, index - 1);
+    });
+
+    rightBtn.addEventListener("click", (event) => {
+      event.stopPropagation();
+
+      moveFolderItem(index, index + 1);
+    });
+
+    card.addEventListener("click", async () => {
+      if (item.removed) return;
+
+      currentIndex = index;
+
+      await loadCurrentImage();
+    });
+
+    galleryGrid.appendChild(card);
+  });
+
+  updateInfo();
+}
+
+function moveFolderItem(from, to) {
+  if (
+    to < 0 ||
+    to >= folderItems.length
+  ) {
+    return;
+  }
+
+  const item =
+    folderItems.splice(from, 1)[0];
+
+  folderItems.splice(
+    to,
+    0,
+    item
+  );
+
+  if (currentIndex === from) {
+    currentIndex = to;
+  } else if (
+    currentIndex > from &&
+    currentIndex <= to
+  ) {
+    currentIndex--;
+  } else if (
+    currentIndex < from &&
+    currentIndex >= to
+  ) {
+    currentIndex++;
+  }
+
+  renderGallery();
+}
+  
+async function loadCurrentImage() {
+  const item = folderItems[currentIndex];
+
+  if (!item || item.removed) return;
+
+  if (currentObjectUrl) {
+    URL.revokeObjectURL(currentObjectUrl);
+  }
+
+  currentObjectUrl = URL.createObjectURL(item.file);
+
+  mainPreview.src = currentObjectUrl;
+  mainPreview.style.display = "block";
+  previewPlaceholder.style.display = "none";
+
+  updateActiveCard();
+  updateInfo();
+}
+
+function updateActiveCard() {
+  const cards = galleryGrid.querySelectorAll(".gallery-card");
+
+  cards.forEach((card, index) => {
+    card.classList.toggle("active", index === currentIndex);
+  });
+}
+
+function updateInfo() {
+  const total = folderItems.length;
+  const removed = folderItems.filter(item => item.removed).length;
+  const active = total - removed;
+
+  let slideSeconds =
+    Math.max(
+      1,
+      Number(slideDelay.value) || 4
+    );
+
+  if (
+    fitMusicCheckbox.checked &&
+    musicDuration > 0 &&
+    active > 0
+  ) {
+    slideSeconds =
+      musicDuration / active;
+  }
+
+  let musicText = "";
+
+  if (
+    musicFile &&
+    musicDuration > 0
+  ) {
+    const musicMinutes =
+      Math.floor(musicDuration / 60);
+
+    const musicSeconds =
+      Math.floor(musicDuration % 60);
+
+    musicText =
+      "\nMusic: " +
+      musicFile.name +
+      " (" +
+      String(musicMinutes).padStart(2, "0") +
+      ":" +
+      String(musicSeconds).padStart(2, "0") +
+      ")";
+  }
+
+  const slideText =
+    "\nSlide: " +
+    slideSeconds.toFixed(1) +
+    " sec";
+
+  folderInfo.textContent =
+    "Images: " + total +
+    " | Active: " + active +
+    " | Removed: " + removed +
+    musicText +
+    slideText +
+    (currentIndex >= 0 && folderItems[currentIndex]
+      ? "\nCurrent: " + (currentIndex + 1) + " / " + total + "\n" + folderItems[currentIndex].path
+      : "");
+
+  prevBtn.disabled =
+    currentIndex === -1 ||
+    findPrevActiveIndex(currentIndex) === -1;
+
+  nextBtn.disabled =
+    currentIndex === -1 ||
+    findNextActiveIndex(currentIndex) === -1;
+
+  clearRemovedBtn.disabled =
+    !folderItems.some(item => item.removed);
+
+  clearAllBtn.disabled =
+    !folderItems.length;
+
+  zipBtn.disabled =
+    !active;
+
+  slideShowBtn.disabled =
+    !active;
+
+  presentationBtn.disabled =
+    !active;
+
+  pdfBookBtn.disabled =
+    !active;
+
+  epubBtn.disabled =
+    !active;
+}
+
+function findPrevActiveIndex(fromIndex) {
+  for (let i = fromIndex - 1; i >= 0; i--) {
+    if (!folderItems[i].removed) return i;
+  }
+
+  return -1;
+}
+
+function findNextActiveIndex(fromIndex) {
+  for (let i = fromIndex + 1; i < folderItems.length; i++) {
+    if (!folderItems[i].removed) return i;
+  }
+
+  return -1;
+}
+
+function getActiveItems() {
+  return folderItems.filter(item => !item.removed);
+}
+
+function clearAll() {
+  folderItems = [];
+  currentIndex = -1;
+
+  galleryGrid.innerHTML = "";
+  folderInfo.textContent = "";
+
+  if (currentObjectUrl) {
+    URL.revokeObjectURL(currentObjectUrl);
+    currentObjectUrl = null;
+  }
+
+  mainPreview.src = "";
+  mainPreview.style.display = "none";
+  previewPlaceholder.style.display = "block";
+
+  updateInfo();
+}
+
+/*
+================================
+BUILDERS
+================================
+*/
+
+function buildSlideshowHtml(slides, options = {}) {
+  const musicDataUrl =
+    options.musicDataUrl || "";
+
+  const delaySeconds =
+    options.delaySeconds || 4;
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Slide Show</title>
+<style>
+body {
+  margin: 0;
+  background: #111;
+  color: white;
+  font-family: Arial, sans-serif;
+  overflow: hidden;
+}
+
+.slide {
+  display: none;
+  width: 100vw;
+  height: 100vh;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.slide.active {
+  display: flex;
+}
+
+img {
+  max-width: 96vw;
+  max-height: 88vh;
+}
+
+.caption {
+  margin-top: 12px;
+  font-size: 18px;
+}
+
+.start-screen {
+  position: fixed;
+  inset: 0;
+  background: #111;
+  color: white;
+  z-index: 99;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.start-screen button {
+  font-size: 22px;
+  padding: 14px 28px;
+  border: none;
+  border-radius: 10px;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+}
+
+.controls {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  font-size: 13px;
+  opacity: 0.7;
+}
+</style>
+</head>
+<body>
+
+<div class="start-screen" id="startScreen">
+  <h1>Slide Show</h1>
+  <button id="startBtn">Start</button>
+</div>
+
+${musicDataUrl
+  ? `<audio id="bgMusic" loop src="${musicDataUrl}"></audio>`
+  : ""}
+
+${slides.map((s, i) => `
+<div class="slide ${i === 0 ? "active" : ""}">
+  <img src="${s.dataUrl}">
+  <div class="caption">${s.name}</div>
+</div>`).join("")}
+
+<div class="controls">
+  Space / → next | ← prev | M music | F fullscreen
+</div>
+
+<script>
+let index = 0;
+let timer = null;
+
+const delay = ${delaySeconds * 1000};
+const slides = document.querySelectorAll(".slide");
+const startScreen = document.getElementById("startScreen");
+const startBtn = document.getElementById("startBtn");
+const bgMusic = document.getElementById("bgMusic");
+
+function show(i) {
+  slides[index].classList.remove("active");
+  index = (i + slides.length) % slides.length;
+  slides[index].classList.add("active");
+}
+
+function next() {
+  show(index + 1);
+}
+
+function prev() {
+  show(index - 1);
+}
+
+function startTimer() {
+  stopTimer();
+  timer = setInterval(next, delay);
+}
+
+function stopTimer() {
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
+}
+
+async function startShow() {
+  startScreen.style.display = "none";
+
+  if (bgMusic) {
+    try {
+      await bgMusic.play();
+    } catch (error) {
+      console.log("music blocked", error);
+    }
+  }
+
+  startTimer();
+}
+
+startBtn.addEventListener("click", startShow);
+
+document.addEventListener("keydown", async (event) => {
+  if (event.key === "ArrowRight" || event.key === " ") {
+    next();
+    startTimer();
+  }
+
+  if (event.key === "ArrowLeft") {
+    prev();
+    startTimer();
+  }
+
+  if (event.key.toLowerCase() === "m" && bgMusic) {
+    if (bgMusic.paused) {
+      await bgMusic.play();
+    } else {
+      bgMusic.pause();
+    }
+  }
+
+  if (event.key.toLowerCase() === "f") {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  }
+});
+<\/script>
+</body>
+</html>`;
+}
+
+function buildPresentationHtml(title, slides) {
+  return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>${escapeHtml(title)}</title>
+<style>
+body {
+  margin: 0;
+  background: #0f172a;
+  color: white;
+  font-family: Arial, sans-serif;
+  overflow: hidden;
+}
+.slide {
+  display: none;
+  width: 100vw;
+  height: 100vh;
+  padding: 40px;
+}
+.slide.active {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+h1 {
+  font-size: 44px;
+}
+h2 {
+  font-size: 28px;
+  margin-bottom: 20px;
+}
+img {
+  max-width: 90vw;
+  max-height: 72vh;
+  border-radius: 12px;
+}
+</style>
+</head>
+<body>
+<div class="slide active">
+  <h1>${escapeHtml(title)}</h1>
+</div>
+${slides.map(s => `
+<div class="slide">
+  <h2>${s.title}</h2>
+  <img src="${s.dataUrl}">
+</div>`).join("")}
+<script>
+let index = 0;
+const slides = document.querySelectorAll(".slide");
+
+function show(i) {
+  slides[index].classList.remove("active");
+  index = (i + slides.length) % slides.length;
+  slides[index].classList.add("active");
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "ArrowRight" || event.key === " ") show(index + 1);
+  if (event.key === "ArrowLeft") show(index - 1);
+});
+<\/script>
+</body>
+</html>`;
+}
+
+/*
+================================
+HELPERS
+================================
+*/
+
+function setStatus(text, type = "") {
+  statusBox.textContent = text;
+  statusBox.className = "status";
+
+  if (type) {
+    statusBox.classList.add(type);
+  }
+}
+
+function clearStatus() {
+  setStatus("");
+}
+
+function downloadFile(file) {
+  const url = URL.createObjectURL(file);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = file.name;
+  link.click();
+
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 1000);
+}
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("file read error"));
+
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("image load error"));
+
+    img.src = src;
+  });
+}
+
+function getExtension(name) {
+  const match = String(name).match(/\.([^.]+)$/);
+  return match ? match[1].toLowerCase() : "";
+}
+
+function guessImageType(name) {
+  const ext = getExtension(name);
+
+  if (ext === "png") return "image/png";
+  if (ext === "webp") return "image/webp";
+  if (ext === "gif") return "image/gif";
+
+  return "image/jpeg";
+}
+
+function getPdfImageType(name) {
+  const ext = getExtension(name);
+
+  if (ext === "png") return "PNG";
+  if (ext === "webp") return "WEBP";
+
+  return "JPEG";
+}
+
+function escapeHtml(text) {
+  return String(text)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function escapeXml(text) {
+  return escapeHtml(text).replaceAll("'", "&apos;");
+}
+</script>
+
+
+
+<!-- ========================================
+     SERVICE CONSOLE
+     Верхняя строка редактируется вручную
+     Здесь задается:
+     - название страницы
+     - номер версии
+======================================== -->
+
+<div id="service-console">
+
+  <div class="row" id="build-top">
+music duration\ delay\fit | v2.1.0
+  </div>
+
+  <div class="row" id="build-down">
+    deploy: --
+  </div>
+
+</div>
+
+<!-- ========================================
+     SCRIPT
+     Автоматически выводит:
+     - дату
+     - время
+     Момент загрузки страницы
+======================================== -->
+
+<script>
+(function () {
+  const now = new Date();
+
+  const pad = n =>
+    String(n).padStart(2, "0");
+
+  const date =
+      pad(now.getDate())
+    + "."
+    + pad(now.getMonth() + 1)
+    + "."
+    + now.getFullYear();
+
+  const time =
+      pad(now.getHours())
+    + ":"
+    + pad(now.getMinutes());
+
+  document
+    .getElementById("build-down")
+    .textContent =
+      "deploy: "
+      + date
+      + " "
+      + time;
+})();
+</script>
+
+</body>
+</html>
