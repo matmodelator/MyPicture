@@ -59,6 +59,21 @@ select {
   border-radius: 8px;
 }
 
+.delay-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.delay-wrap::after {
+  content: "sec";
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #666;
+  pointer-events: none;
+}
+  
 button {
   border: none;
   border-radius: 8px;
@@ -280,38 +295,11 @@ button:disabled {
       <input id="musicInput" type="file" accept="audio/*">
     </div>
 
-    <div class="field">
-  <label for="slideDelay">Delay</label>
-
-  <div style="display:flex;align-items:center;gap:8px;">
-
-    <input
-      id="slideDelay"
-      type="number"
-      value="4"
-      min="1"
-      max="60"
-      step="1">
-
-<span
-  id="slideInfo"
-  style="display:none;">
-  Slide: 0 sec
-</span>
-    
-    <label>
-      <input
-        type="checkbox"
-        id="fitMusicCheckbox">
-      Fit Music
-    </label>
-
-    <span id="slideCalc">
-      Slide: 4.0 sec
-    </span>
-
-  </div>
+   <div class="field">
+  <label for="slideDelay">Delay <input type="checkbox" id="fitMusicCheckbox"> Fit Music</label>
+ <div class="delay-wrap"><input id="slideDelay" type="number" value="4" min="1" max="60" step="1"></div>
 </div>
+
     <div class="field">
       <label>Browse</label>
       <div>
@@ -350,24 +338,39 @@ let folderItems = [];
 let currentIndex = -1;
 let currentObjectUrl = null;
 let musicFile = null;
-let musicDuration = 0;  
+let musicDuration = 0;
+let manualSlideDelay = 4;
 
 const folderInput = document.getElementById("folderInput");
 const zipInput = document.getElementById("zipInput");
 const musicInput = document.getElementById("musicInput");
 const slideDelay = document.getElementById("slideDelay");
-slideDelay.addEventListener(
-  "input",
-  updateInfo
-);
-const slideInfo =
-  document.getElementById("slideInfo");  
-const fitMusicCheckbox = document.getElementById("fitMusicCheckbox");  
-fitMusicCheckbox.addEventListener(
-  "change",
-  updateInfo
-);
-const slideCalc = document.getElementById("slideCalc");  
+
+const fitMusicCheckbox = document.getElementById("fitMusicCheckbox");
+
+let manualSlideDelay = 4;
+
+slideDelay.addEventListener("input", () => {
+
+  if (!fitMusicCheckbox.checked) {
+    manualSlideDelay =
+      Number(slideDelay.value) || 4;
+  }
+
+  updateInfo();
+
+});
+
+fitMusicCheckbox.addEventListener("change", () => {
+
+  if (!fitMusicCheckbox.checked) {
+    slideDelay.value =
+      manualSlideDelay;
+  }
+
+  updateInfo();
+
+});
 const prevBtn = document.getElementById("prevBtn");
 const nextBtn = document.getElementById("nextBtn");
 
@@ -1287,30 +1290,10 @@ function updateInfo() {
 
 if (fitMusicCheckbox.checked) {
 
-  slideDelay.style.display =
-    "none";
+  slideDelay.value =
+    slideSeconds.toFixed(1);
 
-  slideInfo.style.display =
-    "inline";
-
-  slideInfo.textContent =
-    "Slide: " +
-    slideSeconds.toFixed(1) +
-    " sec";
-
-} else {
-
-  slideDelay.style.display =
-    "";
-
-  slideInfo.style.display =
-    "none";
 }
-  
-slideCalc.textContent =
-  "Slide: " +
-  slideSeconds.toFixed(1) +
-  " sec";
   
   let musicText = "";
 
@@ -1777,7 +1760,7 @@ function escapeXml(text) {
 <div id="service-console">
 
   <div class="row" id="build-top">
-delay field  | v2.1.2
+блядь delay\fit | v2.1.3
   </div>
 
   <div class="row" id="build-down">
