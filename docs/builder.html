@@ -106,6 +106,13 @@ button:disabled {
   white-space: pre-line;
 }
 
+.rights-note {
+  font-size: 12px;
+  color: #64748b;
+  max-width: 260px;
+  line-height: 1.3;
+}
+
 .gallery-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -232,6 +239,19 @@ button:disabled {
     </div>
 
     <div class="field">
+      <label for="musicInput">Music</label>
+      <input id="musicInput" type="file" accept="audio/*">
+      <div class="rights-note">
+        Use only audio files you have the right to use and distribute.
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="slideDelay">Delay sec</label>
+      <input id="slideDelay" type="number" value="4" min="1" max="60" step="1">
+    </div>
+
+    <div class="field">
       <label>Browse</label>
       <div>
         <button type="button" id="prevBtn" disabled>Prev</button>
@@ -264,17 +284,16 @@ button:disabled {
 
 </div>
 
-<div id="service-console">
-  builder.html | v1.0.0
-</div>
-
 <script>
 let folderItems = [];
 let currentIndex = -1;
 let currentObjectUrl = null;
+let musicFile = null;
 
 const folderInput = document.getElementById("folderInput");
 const zipInput = document.getElementById("zipInput");
+const musicInput = document.getElementById("musicInput");
+const slideDelay = document.getElementById("slideDelay");
 
 const prevBtn = document.getElementById("prevBtn");
 const nextBtn = document.getElementById("nextBtn");
@@ -406,6 +425,27 @@ zipInput.addEventListener("change", async () => {
 
 /*
 ================================
+OPEN MUSIC
+================================
+*/
+
+musicInput.addEventListener("change", () => {
+  musicFile =
+    musicInput.files && musicInput.files[0]
+      ? musicInput.files[0]
+      : null;
+
+  if (musicFile) {
+    setStatus(
+      "music loaded OK\n" +
+      musicFile.name,
+      "ok"
+    );
+  }
+});
+
+/*
+================================
 NAVIGATION
 ================================
 */
@@ -525,17 +565,38 @@ slideShowBtn.addEventListener("click", async () => {
     const name = prompt("Slideshow file name", "slideshow");
     if (!name) return;
 
+    const delaySeconds =
+      Math.max(
+        1,
+        Number(slideDelay.value) || 4
+      );
+
     const slides = [];
 
     for (const item of activeItems) {
       const dataUrl = await readFileAsDataURL(item.file);
+
       slides.push({
         name: escapeHtml(item.name),
         dataUrl
       });
     }
 
-    const html = buildSlideshowHtml(slides);
+    let musicDataUrl = "";
+
+    if (musicFile) {
+      musicDataUrl =
+        await readFileAsDataURL(musicFile);
+    }
+
+    const html =
+      buildSlideshowHtml(
+        slides,
+        {
+          musicDataUrl,
+          delaySeconds
+        }
+      );
 
     const file = new File(
       [html],
@@ -1012,7 +1073,13 @@ BUILDERS
 ================================
 */
 
-function buildSlideshowHtml(slides) {
+function buildSlideshowHtml(slides, options = {}) {
+  const musicDataUrl =
+    options.musicDataUrl || "";
+
+  const delaySeconds =
+    options.delaySeconds || 4;
+
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -1026,6 +1093,7 @@ body {
   font-family: Arial, sans-serif;
   overflow: hidden;
 }
+
 .slide {
   display: none;
   width: 100vw;
@@ -1034,28 +1102,83 @@ body {
   justify-content: center;
   flex-direction: column;
 }
+
 .slide.active {
   display: flex;
 }
+
 img {
   max-width: 96vw;
   max-height: 88vh;
 }
+
 .caption {
   margin-top: 12px;
   font-size: 18px;
 }
+
+.start-screen {
+  position: fixed;
+  inset: 0;
+  background: #111;
+  color: white;
+  z-index: 99;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.start-screen button {
+  font-size: 22px;
+  padding: 14px 28px;
+  border: none;
+  border-radius: 10px;
+  background: #2563eb;
+  color: white;
+  cursor: pointer;
+}
+
+.controls {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  font-size: 13px;
+  opacity: 0.7;
+}
 </style>
 </head>
 <body>
+
+<div class="start-screen" id="startScreen">
+  <h1>Slide Show</h1>
+  <button id="startBtn">Start</button>
+</div>
+
+${musicDataUrl
+  ? `<audio id="bgMusic" loop src="${musicDataUrl}"></audio>`
+  : ""}
+
 ${slides.map((s, i) => `
 <div class="slide ${i === 0 ? "active" : ""}">
   <img src="${s.dataUrl}">
   <div class="caption">${s.name}</div>
 </div>`).join("")}
+
+<div class="controls">
+  Space / → next | ← prev | M music | F fullscreen
+</div>
+
 <script>
 let index = 0;
+let timer = null;
+
+const delay = ${delaySeconds * 1000};
 const slides = document.querySelectorAll(".slide");
+const startScreen = document.getElementById("startScreen");
+const startBtn = document.getElementById("startBtn");
+const bgMusic = document.getElementById("bgMusic");
 
 function show(i) {
   slides[index].classList.remove("active");
@@ -1063,9 +1186,68 @@ function show(i) {
   slides[index].classList.add("active");
 }
 
-document.addEventListener("keydown", (event) => {
-  if (event.key === "ArrowRight" || event.key === " ") show(index + 1);
-  if (event.key === "ArrowLeft") show(index - 1);
+function next() {
+  show(index + 1);
+}
+
+function prev() {
+  show(index - 1);
+}
+
+function startTimer() {
+  stopTimer();
+  timer = setInterval(next, delay);
+}
+
+function stopTimer() {
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
+}
+
+async function startShow() {
+  startScreen.style.display = "none";
+
+  if (bgMusic) {
+    try {
+      await bgMusic.play();
+    } catch (error) {
+      console.log("music blocked", error);
+    }
+  }
+
+  startTimer();
+}
+
+startBtn.addEventListener("click", startShow);
+
+document.addEventListener("keydown", async (event) => {
+  if (event.key === "ArrowRight" || event.key === " ") {
+    next();
+    startTimer();
+  }
+
+  if (event.key === "ArrowLeft") {
+    prev();
+    startTimer();
+  }
+
+  if (event.key.toLowerCase() === "m" && bgMusic) {
+    if (bgMusic.paused) {
+      await bgMusic.play();
+    } else {
+      bgMusic.pause();
+    }
+  }
+
+  if (event.key.toLowerCase() === "f") {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  }
 });
 <\/script>
 </body>
@@ -1244,7 +1426,7 @@ function escapeXml(text) {
 <div id="service-console">
 
   <div class="row" id="build-top">
-gpt | v1.0.0
++ music | v1.1.0
   </div>
 
   <div class="row" id="build-down">
