@@ -2141,12 +2141,25 @@ zipBtn.addEventListener("click", async () => {
         type: "blob"
       });
 
-    const zipFile =
-      new File(
-        [blob],
-        "selected_photos.zip",
-        { type: "application/zip" }
-      );
+    const zipName =
+  prompt(
+    "ZIP file name",
+    "selected_photos"
+  );
+
+if (!zipName)
+  return;
+
+const zipFile =
+  new File(
+    [blob],
+    zipName.endsWith(".zip")
+      ? zipName
+      : zipName + ".zip",
+    {
+      type: "application/zip"
+    }
+  );
 
     await downloadFileDirect(zipFile);
 
@@ -3359,7 +3372,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-ZiP| v5.4.0
+ZiP name| v5.4.1
   </div>
 
   <div class="row" id="build-down">
