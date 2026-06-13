@@ -2106,6 +2106,7 @@ zipBtn.addEventListener("click", async () => {
   }
 
   try {
+
     clearStatus();
 
     if (!window.JSZip) {
@@ -2121,19 +2122,30 @@ zipBtn.addEventListener("click", async () => {
       return;
     }
 
+    const zipName =
+      prompt(
+        "ZIP file name",
+        "selected_photos"
+      );
+
+    if (!zipName)
+      return;
+
+    const folderName =
+      zipName.replace(/\.zip$/i, "");
+
     const zip =
       new JSZip();
 
     activeItems.forEach((item) => {
+
       const file = item.file;
 
-      const path =
-        file.webkitRelativePath || file.name;
-
       zip.file(
-        path,
+        folderName + "/" + file.name,
         file
       );
+
     });
 
     const blob =
@@ -2141,40 +2153,35 @@ zipBtn.addEventListener("click", async () => {
         type: "blob"
       });
 
-    const zipName =
-  prompt(
-    "ZIP file name",
-    "selected_photos"
-  );
-
-if (!zipName)
-  return;
-
-const zipFile =
-  new File(
-    [blob],
-    zipName.endsWith(".zip")
-      ? zipName
-      : zipName + ".zip",
-    {
-      type: "application/zip"
-    }
-  );
+    const zipFile =
+      new File(
+        [blob],
+        zipName.endsWith(".zip")
+          ? zipName
+          : zipName + ".zip",
+        {
+          type: "application/zip"
+        }
+      );
 
     await downloadFileDirect(zipFile);
 
     setStatus(
       "ZIP OK\n" +
       activeItems.length +
-      " files"
+      " files\n" +
+      zipFile.name
     );
 
   } catch (error) {
+
     setStatus(
       "ERROR: " +
       (error.message || error)
     );
+
   }
+
 });
    
 /*
@@ -3372,7 +3379,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-ZiP name| v5.4.1
+ZiP the same name to Dir| v5.4.2
   </div>
 
   <div class="row" id="build-down">
