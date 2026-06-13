@@ -293,6 +293,12 @@ button:disabled {
       max="60"
       step="1">
 
+<span
+  id="slideInfo"
+  style="display:none;">
+  Slide: 0 sec
+</span>
+    
     <label>
       <input
         type="checkbox"
@@ -354,6 +360,8 @@ slideDelay.addEventListener(
   "input",
   updateInfo
 );
+const slideInfo =
+  document.getElementById("slideInfo");  
 const fitMusicCheckbox = document.getElementById("fitMusicCheckbox");  
 fitMusicCheckbox.addEventListener(
   "change",
@@ -1277,6 +1285,28 @@ function updateInfo() {
       musicDuration / active;
   }
 
+if (fitMusicCheckbox.checked) {
+
+  slideDelay.style.display =
+    "none";
+
+  slideInfo.style.display =
+    "inline";
+
+  slideInfo.textContent =
+    "Slide: " +
+    slideSeconds.toFixed(1) +
+    " sec";
+
+} else {
+
+  slideDelay.style.display =
+    "";
+
+  slideInfo.style.display =
+    "none";
+}
+  
 slideCalc.textContent =
   "Slide: " +
   slideSeconds.toFixed(1) +
@@ -1747,7 +1777,7 @@ function escapeXml(text) {
 <div id="service-console">
 
   <div class="row" id="build-top">
-delay fix | v2.1.1
+delay field  | v2.1.2
   </div>
 
   <div class="row" id="build-down">
