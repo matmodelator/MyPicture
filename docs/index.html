@@ -10,6 +10,8 @@
 
 <!-- Библиотека для создания PDF -->
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<!-- Библиотека для создания ZiP -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>   
 
 <style>
 /* ========================================
@@ -634,6 +636,10 @@ The image is fitted into the page with selected margins and orientation.
     Print
   </button>
 
+  <button type="button" id="zipBtn">
+    ZIP
+  </button>
+          
 </div>
 
       </div>
@@ -905,6 +911,9 @@ const sendBtn =
 
 const printBtn =
   document.getElementById("printBtn");
+
+const zipBtn =
+  document.getElementById("zipBtn");   
    
 const cropPanel = document.getElementById("cropPanel");
 const resizePanel = document.getElementById("resizePanel");
@@ -2082,7 +2091,79 @@ img{
     );
   }
 });   
- 
+
+/*
+================================
+ZIP
+================================
+*/
+
+zipBtn.addEventListener("click", async () => {
+
+  if (!folderFiles.length) {
+    setStatus("No folder files");
+    return;
+  }
+
+  try {
+    clearStatus();
+
+    if (!window.JSZip) {
+      setStatus("ERROR: JSZip not loaded");
+      return;
+    }
+
+    const activeItems =
+      folderFiles.filter(item => !item.removed);
+
+    if (!activeItems.length) {
+      setStatus("ERROR: no active files to zip");
+      return;
+    }
+
+    const zip =
+      new JSZip();
+
+    activeItems.forEach((item) => {
+      const file = item.file;
+
+      const path =
+        file.webkitRelativePath || file.name;
+
+      zip.file(
+        path,
+        file
+      );
+    });
+
+    const blob =
+      await zip.generateAsync({
+        type: "blob"
+      });
+
+    const zipFile =
+      new File(
+        [blob],
+        "selected_photos.zip",
+        { type: "application/zip" }
+      );
+
+    await downloadFileDirect(zipFile);
+
+    setStatus(
+      "ZIP OK\n" +
+      activeItems.length +
+      " files"
+    );
+
+  } catch (error) {
+    setStatus(
+      "ERROR: " +
+      (error.message || error)
+    );
+  }
+});
+   
 /*
 ================================
 РАБОТА С ИСТОРИЕЙ
@@ -3278,7 +3359,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-Крестики - нолики без ебаной хуйни всякой| v5.3.4
+ZiP| v5.4.0
   </div>
 
   <div class="row" id="build-down">
