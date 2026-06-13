@@ -281,18 +281,31 @@ button:disabled {
     </div>
 
     <div class="field">
-      <label for="slideDelay">Delay sec</label>
-      <input id="slideDelay" type="number" value="4" min="1" max="60" step="1">
+  <label for="slideDelay">Delay</label>
 
-     <label>
-  <input
-    type="checkbox"
-    id="fitMusicCheckbox">
-  Fit Music
-</label> 
-      
-    </div>
+  <div style="display:flex;align-items:center;gap:8px;">
 
+    <input
+      id="slideDelay"
+      type="number"
+      value="4"
+      min="1"
+      max="60"
+      step="1">
+
+    <label>
+      <input
+        type="checkbox"
+        id="fitMusicCheckbox">
+      Fit Music
+    </label>
+
+    <span id="slideCalc">
+      Slide: 4.0 sec
+    </span>
+
+  </div>
+</div>
     <div class="field">
       <label>Browse</label>
       <div>
@@ -346,6 +359,7 @@ fitMusicCheckbox.addEventListener(
   "change",
   updateInfo
 );
+const slideCalc = document.getElementById("slideCalc");  
 const prevBtn = document.getElementById("prevBtn");
 const nextBtn = document.getElementById("nextBtn");
 
@@ -1263,6 +1277,11 @@ function updateInfo() {
       musicDuration / active;
   }
 
+slideCalc.textContent =
+  "Slide: " +
+  slideSeconds.toFixed(1) +
+  " sec";
+  
   let musicText = "";
 
   if (
@@ -1728,7 +1747,7 @@ function escapeXml(text) {
 <div id="service-console">
 
   <div class="row" id="build-top">
-music duration\ delay\fit | v2.1.0
+delay fix | v2.1.1
   </div>
 
   <div class="row" id="build-down">
