@@ -282,8 +282,10 @@ button:disabled {
 
   <div class="field">
   <label for="slideDelay">Delay <input type="checkbox" id="fitMusicCheckbox"> Fit Music</label>
-  <input id="slideDelay" type="number" value="4" min="1" max="60" step="1">
-  <span>sec</span>
+  <div style="display:flex;align-items:center;gap:4px;">
+    <input id="slideDelay" type="number" value="4" min="1" max="60" step="1">
+    <span>sec</span>
+  </div>
 </div>
 
     <div class="field">
@@ -1744,7 +1746,7 @@ function escapeXml(text) {
 <div id="service-console">
 
   <div class="row" id="build-top">
-fix sec | v2.1.6
+new fix sec | v2.1.7
   </div>
 
   <div class="row" id="build-down">
