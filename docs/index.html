@@ -419,6 +419,7 @@ button.active {
 
 .color-grid,
 .crop-grid,
+.lasso-grid,
 .pdf-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
@@ -574,6 +575,11 @@ The image is fitted into the page with selected margins and orientation.
         </div>
 
         <div class="tool-wrap" data-tip-wrap>
+          <button id="lassoModeBtn" type="button">LASSO</button>
+          <div class="tool-tip">Polygon, Freehand or Magnetic Lasso selection.</div>
+        </div>
+
+        <div class="tool-wrap" data-tip-wrap>
           <button id="zoomModeBtn" type="button">Zoom</button>
           <div class="tool-tip">Set center, zoom with wheel or pinch, drag the image when zoomed.</div>
         </div>
@@ -586,11 +592,6 @@ The image is fitted into the page with selected margins and orientation.
         <div class="tool-wrap" data-tip-wrap>
           <button id="colorModeBtn" type="button">Color</button>
           <div class="tool-tip">Adjust brightness, saturation, contrast and temperature.</div>
-        </div>
-
-        <div class="tool-wrap" data-tip-wrap>
-          <button id="keyModeBtn" type="button">Key</button>
-          <div class="tool-tip">Remove a selected color with tolerance and edge softness.</div>
         </div>
 
         <div class="tool-wrap" data-tip-wrap>
@@ -665,6 +666,42 @@ The image is fitted into the page with selected margins and orientation.
       </div>
     </div>
 
+    <!-- Панель LASSO: три режима под одной кнопкой -->
+    <div id="lassoPanel" class="mode-panel">
+      <div class="lasso-grid">
+
+        <div class="field">
+          <label for="lassoType">Lasso mode</label>
+          <select id="lassoType">
+            <option value="polygon">Polygon</option>
+            <option value="freehand">Freehand</option>
+            <option value="magnetic">Magnetic</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="magneticRadius">Magnetic radius: <span id="magneticRadiusValue">12 px</span></label>
+          <input id="magneticRadius" type="range" min="3" max="30" step="1" value="12">
+        </div>
+
+        <div class="field">
+          <label>Selection</label>
+          <div>
+            <button id="closeLassoBtn" type="button">Close</button>
+            <button id="clearLassoBtn" type="button">Clear</button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="note">
+Polygon: click points; double-click, Enter or Close finishes the contour.
+Freehand: hold and draw the contour.
+Magnetic: hold and draw; points snap to nearby image edges.
+Outside the closed contour becomes transparent after Apply.
+      </div>
+    </div>
+
     <!-- Панель Resize видна только при активном режиме Resize -->
     <div id="resizePanel" class="mode-panel">
       <div class="crop-grid">
@@ -725,36 +762,6 @@ With aspect ratio OFF, Width and Height are independent.
       </div>
     </div>
 
-    <!-- Панель Key видна только при активном режиме Key -->
-    <div id="keyPanel" class="mode-panel">
-      <div class="color-grid">
-
-        <div class="field">
-          <label for="keyColor">Key color</label>
-          <input id="keyColor" type="color" value="#00ff00">
-        </div>
-
-        <div class="slider-wrap">
-          <label for="keyToleranceRange">Tolerance</label>
-          <input id="keyToleranceRange" type="range" min="0" max="255" step="1" value="60">
-          <div class="slider-value" id="keyToleranceValue">60</div>
-        </div>
-
-        <div class="slider-wrap">
-          <label for="keySoftnessRange">Softness</label>
-          <input id="keySoftnessRange" type="range" min="0" max="100" step="1" value="20">
-          <div class="slider-value" id="keySoftnessValue">20</div>
-        </div>
-
-      </div>
-
-      <div class="note">
-Key removes the selected color.
-Tolerance controls the color range.
-Softness smooths the transparent edge.
-      </div>
-    </div>
-
 <div id="folderBrowser" class="mode-panel">
   <div id="folderList" class="note"></div>
   <div id="folderThumbs" class="gallery-grid"></div>
@@ -770,10 +777,10 @@ Softness smooths the transparent edge.
 
     <div class="note">
 Crop: activate the button and select a rectangle.
+LASSO: choose Polygon, Freehand or Magnetic and create a closed contour.
 Zoom: activate the button, click to set center, use wheel or pinch to zoom, drag when zoomed.
 Resize: set final Width and Height, with or without aspect ratio.
 Color: activate the button and adjust sliders.
-Key: select a color, tolerance and edge softness.
 Apply: builds Result from the current Editor settings.
 Use as source: loads Result back into Editor.
 Avatar: creates a round avatar and also loads it back into the editor.
@@ -830,7 +837,7 @@ let sourceImage = null;
 let imageNaturalWidth = 0;
 let imageNaturalHeight = 0;
 
-/* Активный режим: null | crop | zoom | resize | color | key */
+/* Активный режим: null | crop | lasso | zoom | resize | color */
 let activeMode = null;
 
 /*
@@ -853,6 +860,20 @@ let cropRect = null;
 let isSelectingCrop = false;
 let cropStartX = 0;
 let cropStartY = 0;
+
+/*
+  СОСТОЯНИЕ LASSO
+  points — точки контура в координатах Editor canvas.
+  closed — контур завершён и готов к Apply.
+*/
+let lassoPoints = [];
+let lassoClosed = false;
+let isDrawingLasso = false;
+let magneticRadiusValueState = 12;
+
+/* Отдельный служебный canvas для поиска границ Magnetic Lasso */
+const lassoSampleCanvas = document.createElement("canvas");
+const lassoSampleCtx = lassoSampleCanvas.getContext("2d", { willReadFrequently: true });
 
 /*
   СОСТОЯНИЕ RESIZE
@@ -900,19 +921,6 @@ const colorState = {
 };
 
 /*
-  СОСТОЯНИЕ KEY
-  enabled — применять удаление выбранного цвета.
-  tolerance — диапазон близких цветов.
-  softness — мягкость границы прозрачности.
-*/
-const keyState = {
-  enabled: false,
-  color: "#00ff00",
-  tolerance: 60,
-  softness: 20
-};
-
-/*
 ================================
 DOM-ЭЛЕМЕНТЫ
 ================================
@@ -941,10 +949,10 @@ const pdfOrientation = document.getElementById("pdfOrientation");
 const pdfMargin = document.getElementById("pdfMargin");
 
 const cropModeBtn = document.getElementById("cropModeBtn");
+const lassoModeBtn = document.getElementById("lassoModeBtn");
 const zoomModeBtn = document.getElementById("zoomModeBtn");
 const resizeModeBtn = document.getElementById("resizeModeBtn");
 const colorModeBtn = document.getElementById("colorModeBtn");
-const keyModeBtn = document.getElementById("keyModeBtn");
 
 const backToOriginalBtn = document.getElementById("backToOriginalBtn");
 const undoBtn = document.getElementById("undoBtn");
@@ -966,13 +974,19 @@ const zipBtn =
   document.getElementById("zipBtn");   
    
 const cropPanel = document.getElementById("cropPanel");
+const lassoPanel = document.getElementById("lassoPanel");
 const resizePanel = document.getElementById("resizePanel");
 const colorPanel = document.getElementById("colorPanel");
-const keyPanel = document.getElementById("keyPanel");
 
 const resizeWidth = document.getElementById("resizeWidth");
 const resizeHeight = document.getElementById("resizeHeight");
 const keepAspect = document.getElementById("keepAspect");
+
+const lassoType = document.getElementById("lassoType");
+const magneticRadius = document.getElementById("magneticRadius");
+const magneticRadiusValue = document.getElementById("magneticRadiusValue");
+const closeLassoBtn = document.getElementById("closeLassoBtn");
+const clearLassoBtn = document.getElementById("clearLassoBtn");
 
 const brightnessRange = document.getElementById("brightnessRange");
 const saturationRange = document.getElementById("saturationRange");
@@ -983,12 +997,6 @@ const brightnessValue = document.getElementById("brightnessValue");
 const saturationValue = document.getElementById("saturationValue");
 const contrastValue = document.getElementById("contrastValue");
 const temperatureValue = document.getElementById("temperatureValue");
-
-const keyColor = document.getElementById("keyColor");
-const keyToleranceRange = document.getElementById("keyToleranceRange");
-const keySoftnessRange = document.getElementById("keySoftnessRange");
-const keyToleranceValue = document.getElementById("keyToleranceValue");
-const keySoftnessValue = document.getElementById("keySoftnessValue");
 
 const editCanvas = document.getElementById("editCanvas");
 const editCtx = editCanvas.getContext("2d");
@@ -1467,15 +1475,10 @@ function finishFileInput() {
 */
 
 cropModeBtn.addEventListener("click", () => toggleMode("crop"));
+lassoModeBtn.addEventListener("click", () => toggleMode("lasso"));
 zoomModeBtn.addEventListener("click", () => toggleMode("zoom"));
 resizeModeBtn.addEventListener("click", () => toggleMode("resize"));
 colorModeBtn.addEventListener("click", () => toggleMode("color"));
-keyModeBtn.addEventListener("click", () => {
-  if (activeMode !== "key") {
-    keyState.enabled = true;
-  }
-  toggleMode("key");
-});
 
 function toggleMode(mode) {
   if (!sourceImage) {
@@ -1490,23 +1493,66 @@ function toggleMode(mode) {
 
 function updateModeUI() {
   cropModeBtn.classList.toggle("active", activeMode === "crop");
+  lassoModeBtn.classList.toggle("active", activeMode === "lasso");
   zoomModeBtn.classList.toggle("active", activeMode === "zoom");
   resizeModeBtn.classList.toggle("active", activeMode === "resize");
   colorModeBtn.classList.toggle("active", activeMode === "color");
-  keyModeBtn.classList.toggle("active", activeMode === "key");
 
   cropPanel.classList.toggle("visible", activeMode === "crop");
+  lassoPanel.classList.toggle("visible", activeMode === "lasso");
   resizePanel.classList.toggle("visible", activeMode === "resize");
   colorPanel.classList.toggle("visible", activeMode === "color");
-  keyPanel.classList.toggle("visible", activeMode === "key");
 
-  if (activeMode === "crop") {
+  if (activeMode === "crop" || activeMode === "lasso") {
     editCanvas.style.cursor = "crosshair";
   } else if (activeMode === "zoom") {
     editCanvas.style.cursor = isPanningResize ? "grabbing" : (resizeView.zoom > 1 ? "grab" : "pointer");
   } else {
     editCanvas.style.cursor = "default";
   }
+}
+
+/*
+================================
+УПРАВЛЕНИЕ LASSO
+================================
+*/
+
+lassoType.addEventListener("change", () => {
+  clearLassoSelection();
+  drawEditor();
+});
+
+magneticRadius.addEventListener("input", () => {
+  magneticRadiusValueState = Number(magneticRadius.value) || 12;
+  magneticRadiusValue.textContent = magneticRadiusValueState + " px";
+});
+
+closeLassoBtn.addEventListener("click", () => {
+  closeLassoSelection();
+});
+
+clearLassoBtn.addEventListener("click", () => {
+  clearLassoSelection();
+  drawEditor();
+});
+
+function clearLassoSelection() {
+  lassoPoints = [];
+  lassoClosed = false;
+  isDrawingLasso = false;
+}
+
+function closeLassoSelection() {
+  if (lassoPoints.length < 3) {
+    setStatus("Lasso needs at least 3 points");
+    return;
+  }
+
+  lassoClosed = true;
+  isDrawingLasso = false;
+  drawEditor();
+  setStatus("Lasso closed OK");
 }
 
 /*
@@ -1573,41 +1619,6 @@ function syncResizeFieldsFromImage(width, height) {
 
 /*
 ================================
-НАСТРОЙКИ KEY
-================================
-*/
-
-keyColor.addEventListener("input", () => {
-  keyState.enabled = true;
-  keyState.color = keyColor.value;
-
-  if (sourceImage) {
-    drawEditor();
-  }
-});
-
-keyToleranceRange.addEventListener("input", () => {
-  keyState.enabled = true;
-  keyState.tolerance = Number(keyToleranceRange.value);
-  keyToleranceValue.textContent = keyToleranceRange.value;
-
-  if (sourceImage) {
-    drawEditor();
-  }
-});
-
-keySoftnessRange.addEventListener("input", () => {
-  keyState.enabled = true;
-  keyState.softness = Number(keySoftnessRange.value);
-  keySoftnessValue.textContent = keySoftnessRange.value;
-
-  if (sourceImage) {
-    drawEditor();
-  }
-});
-
-/*
-================================
 ПОЛЗУНКИ ЦВЕТА
 ================================
 */
@@ -1646,6 +1657,8 @@ applyBtn.addEventListener("click", async () => {
     processedFile = await buildFinalFile(sourceFile, {
       useCrop: activeMode === "crop" && !!cropRect,
       cropRectCanvas: cropRect,
+      useLasso: activeMode === "lasso" && lassoClosed && lassoPoints.length >= 3,
+      lassoPointsCanvas: lassoPoints,
       canvasWidth: editCanvas.width,
       canvasHeight: editCanvas.height,
       imageWidth: imageNaturalWidth,
@@ -1656,7 +1669,6 @@ applyBtn.addEventListener("click", async () => {
       targetWidth: Number(resizeWidth.value),
       targetHeight: Number(resizeHeight.value),
       colorState,
-      keyState,
       quality: Number(qualityInput.value) || 0.75
     });
 
@@ -1773,7 +1785,6 @@ makeAvatarBtn.addEventListener("click", async () => {
       imageHeight: imageNaturalHeight,
       targetSize: Number(resizeWidth.value) || 800,
       colorState,
-      keyState,
       quality: Number(qualityInput.value) || 0.75
     });
 
@@ -2342,6 +2353,12 @@ async function loadSourceFileIntoEditor(file) {
   sourceImage = img;
   imageNaturalWidth = img.width;
   imageNaturalHeight = img.height;
+
+  /* Копия изображения для поиска контрастных границ Magnetic Lasso */
+  lassoSampleCanvas.width = img.width;
+  lassoSampleCanvas.height = img.height;
+  lassoSampleCtx.clearRect(0, 0, img.width, img.height);
+  lassoSampleCtx.drawImage(img, 0, 0);
   syncResizeFieldsFromImage(img.width, img.height);
 
   /*
@@ -2369,6 +2386,7 @@ editCanvas.height = img.height;
 function resetAllEditingState() {
   setDefaultCrop();
   setDefaultResizeView();
+  clearLassoSelection();
 
   colorState.brightness = 0;
   colorState.saturation = 0;
@@ -2384,17 +2402,6 @@ function resetAllEditingState() {
   saturationValue.textContent = "0";
   contrastValue.textContent = "0";
   temperatureValue.textContent = "0";
-
-  keyState.enabled = false;
-  keyState.color = "#00ff00";
-  keyState.tolerance = 60;
-  keyState.softness = 20;
-
-  keyColor.value = "#00ff00";
-  keyToleranceRange.value = 60;
-  keySoftnessRange.value = 20;
-  keyToleranceValue.textContent = "60";
-  keySoftnessValue.textContent = "20";
 
   isSelectingCrop = false;
   isPanningResize = false;
@@ -2482,12 +2489,12 @@ function drawNormalEditor() {
     applyTemperatureOverlay(editCtx, editCanvas.width, editCanvas.height, colorState.temperature);
   }
 
-  if (keyState.enabled) {
-    applyColorKey(editCtx, editCanvas.width, editCanvas.height, keyState);
-  }
-
   if (activeMode === "crop" && cropRect) {
     drawCropOverlay();
+  }
+
+  if (activeMode === "lasso" && lassoPoints.length) {
+    drawLassoOverlay();
   }
 }
 
@@ -2506,10 +2513,6 @@ function drawResizeEditor() {
 
   if (colorState.temperature !== 0) {
     applyTemperatureOverlay(editCtx, editCanvas.width, editCanvas.height, colorState.temperature);
-  }
-
-  if (keyState.enabled) {
-    applyColorKey(editCtx, editCanvas.width, editCanvas.height, keyState);
   }
 
   editCtx.save();
@@ -2558,18 +2561,84 @@ function drawCropOverlay() {
     editCtx.restore();
   }
 
-  if (keyState.enabled) {
-    editCtx.save();
-    editCtx.beginPath();
-    editCtx.rect(cropRect.x, cropRect.y, cropRect.width, cropRect.height);
-    editCtx.clip();
-    applyColorKey(editCtx, editCanvas.width, editCanvas.height, keyState);
-    editCtx.restore();
-  }
-
   editCtx.strokeStyle = "#2563eb";
   editCtx.lineWidth = 2;
   editCtx.strokeRect(cropRect.x, cropRect.y, cropRect.width, cropRect.height);
+}
+
+/*
+================================
+ОТРИСОВКА LASSO
+================================
+*/
+
+function drawLassoOverlay() {
+  if (!lassoPoints.length)
+    return;
+
+  editCtx.save();
+
+  if (lassoClosed && lassoPoints.length >= 3) {
+    editCtx.fillStyle = "rgba(0, 0, 0, 0.42)";
+    editCtx.fillRect(0, 0, editCanvas.width, editCanvas.height);
+
+    editCtx.globalCompositeOperation = "destination-out";
+    traceLassoPath(editCtx, lassoPoints, true);
+    editCtx.fill();
+    editCtx.globalCompositeOperation = "source-over";
+
+    editCtx.save();
+    traceLassoPath(editCtx, lassoPoints, true);
+    editCtx.clip();
+    editCtx.filter = buildCanvasFilterString(colorState);
+    editCtx.drawImage(
+      sourceImage,
+      0, 0, imageNaturalWidth, imageNaturalHeight,
+      0, 0, editCanvas.width, editCanvas.height
+    );
+    editCtx.filter = "none";
+    if (colorState.temperature !== 0) {
+      applyTemperatureOverlay(editCtx, editCanvas.width, editCanvas.height, colorState.temperature);
+    }
+    editCtx.restore();
+  }
+
+  editCtx.strokeStyle = lassoClosed ? "#16a34a" : "#2563eb";
+  editCtx.lineWidth = Math.max(2, Math.round(Math.min(editCanvas.width, editCanvas.height) / 400));
+  editCtx.setLineDash(lassoClosed ? [] : [8, 6]);
+  traceLassoPath(editCtx, lassoPoints, lassoClosed);
+  editCtx.stroke();
+  editCtx.setLineDash([]);
+
+  if (lassoType.value === "polygon") {
+    editCtx.fillStyle = "#ffffff";
+    editCtx.strokeStyle = "#2563eb";
+    editCtx.lineWidth = 2;
+
+    lassoPoints.forEach((point) => {
+      editCtx.beginPath();
+      editCtx.arc(point.x, point.y, 4, 0, Math.PI * 2);
+      editCtx.fill();
+      editCtx.stroke();
+    });
+  }
+
+  editCtx.restore();
+}
+
+function traceLassoPath(ctx, points, closePath) {
+  if (!points.length)
+    return;
+
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+
+  for (let i = 1; i < points.length; i++) {
+    ctx.lineTo(points[i].x, points[i].y);
+  }
+
+  if (closePath)
+    ctx.closePath();
 }
 
 /*
@@ -2602,83 +2671,6 @@ function applyTemperatureOverlay(ctx, width, height, temperature) {
   }
 
   ctx.restore();
-}
-
-
-/*
-================================
-ЭФФЕКТ KEY
-================================
-*/
-
-function hexToRgb(hex) {
-  const value = String(hex || "#00ff00").replace("#", "");
-
-  return {
-    r: parseInt(value.slice(0, 2), 16) || 0,
-    g: parseInt(value.slice(2, 4), 16) || 0,
-    b: parseInt(value.slice(4, 6), 16) || 0
-  };
-}
-
-function applyColorKey(ctx, width, height, state) {
-  if (!state || !state.enabled)
-    return;
-
-  const imageData =
-    ctx.getImageData(0, 0, width, height);
-
-  const data =
-    imageData.data;
-
-  const key =
-    hexToRgb(state.color);
-
-  const tolerance =
-    Math.max(0, Number(state.tolerance) || 0);
-
-  const softness =
-    Math.max(0, Number(state.softness) || 0);
-
-  const softEnd =
-    tolerance + softness;
-
-  for (let i = 0; i < data.length; i += 4) {
-    const dr = data[i] - key.r;
-    const dg = data[i + 1] - key.g;
-    const db = data[i + 2] - key.b;
-
-    const distance =
-      Math.sqrt(
-        dr * dr +
-        dg * dg +
-        db * db
-      );
-
-    if (distance <= tolerance) {
-      data[i + 3] = 0;
-      continue;
-    }
-
-    if (
-      softness > 0 &&
-      distance < softEnd
-    ) {
-      const ratio =
-        (distance - tolerance) / softness;
-
-      data[i + 3] =
-        Math.round(
-          data[i + 3] * ratio
-        );
-    }
-  }
-
-  ctx.putImageData(
-    imageData,
-    0,
-    0
-  );
 }
 
 /*
@@ -2721,6 +2713,8 @@ async function buildFinalFile(file, options = {}) {
   const {
     useCrop,
     cropRectCanvas,
+    useLasso,
+    lassoPointsCanvas,
     canvasWidth,
     canvasHeight,
     imageWidth,
@@ -2730,7 +2724,6 @@ async function buildFinalFile(file, options = {}) {
     targetWidth,
     targetHeight,
     colorState,
-    keyState,
     quality = 0.8
   } = options;
 
@@ -2741,8 +2734,30 @@ async function buildFinalFile(file, options = {}) {
   let srcY = 0;
   let srcW = imageWidth;
   let srcH = imageHeight;
+  let lassoImagePoints = null;
 
-  if (useZoom) {
+  if (useLasso && Array.isArray(lassoPointsCanvas) && lassoPointsCanvas.length >= 3) {
+    const scaleX = imageWidth / canvasWidth;
+    const scaleY = imageHeight / canvasHeight;
+
+    lassoImagePoints = lassoPointsCanvas.map((point) => ({
+      x: clamp(point.x * scaleX, 0, imageWidth),
+      y: clamp(point.y * scaleY, 0, imageHeight)
+    }));
+
+    const xs = lassoImagePoints.map(point => point.x);
+    const ys = lassoImagePoints.map(point => point.y);
+
+    const minX = Math.floor(Math.min(...xs));
+    const minY = Math.floor(Math.min(...ys));
+    const maxX = Math.ceil(Math.max(...xs));
+    const maxY = Math.ceil(Math.max(...ys));
+
+    srcX = minX;
+    srcY = minY;
+    srcW = Math.max(1, maxX - minX);
+    srcH = Math.max(1, maxY - minY);
+  } else if (useZoom) {
     const rect = getResizeSourceRect();
     srcX = Math.round(rect.srcX);
     srcY = Math.round(rect.srcY);
@@ -2787,20 +2802,63 @@ async function buildFinalFile(file, options = {}) {
 
   outCtx.filter = buildCanvasFilterString(colorState);
 
-  outCtx.drawImage(
-    image,
-    srcX, srcY, srcW, srcH,
-    0, 0, finalWidth, finalHeight
-  );
+  if (lassoImagePoints) {
+    const scaleOutX = finalWidth / srcW;
+    const scaleOutY = finalHeight / srcH;
+
+    outCtx.save();
+    outCtx.beginPath();
+
+    lassoImagePoints.forEach((point, index) => {
+      const x = (point.x - srcX) * scaleOutX;
+      const y = (point.y - srcY) * scaleOutY;
+
+      if (index === 0)
+        outCtx.moveTo(x, y);
+      else
+        outCtx.lineTo(x, y);
+    });
+
+    outCtx.closePath();
+    outCtx.clip();
+
+    outCtx.drawImage(
+      image,
+      srcX, srcY, srcW, srcH,
+      0, 0, finalWidth, finalHeight
+    );
+
+    outCtx.restore();
+  } else {
+    outCtx.drawImage(
+      image,
+      srcX, srcY, srcW, srcH,
+      0, 0, finalWidth, finalHeight
+    );
+  }
 
   outCtx.filter = "none";
 
   if (colorState.temperature !== 0) {
-    applyTemperatureOverlay(outCtx, finalWidth, finalHeight, colorState.temperature);
-  }
+    if (lassoImagePoints) {
+      const scaleOutX = finalWidth / srcW;
+      const scaleOutY = finalHeight / srcH;
 
-  if (keyState && keyState.enabled) {
-    applyColorKey(outCtx, finalWidth, finalHeight, keyState);
+      outCtx.save();
+      outCtx.beginPath();
+      lassoImagePoints.forEach((point, index) => {
+        const x = (point.x - srcX) * scaleOutX;
+        const y = (point.y - srcY) * scaleOutY;
+        if (index === 0) outCtx.moveTo(x, y);
+        else outCtx.lineTo(x, y);
+      });
+      outCtx.closePath();
+      outCtx.clip();
+      applyTemperatureOverlay(outCtx, finalWidth, finalHeight, colorState.temperature);
+      outCtx.restore();
+    } else {
+      applyTemperatureOverlay(outCtx, finalWidth, finalHeight, colorState.temperature);
+    }
   }
 
   const blob = await canvasToBlob(outCanvas, "image/webp", quality);
@@ -2828,7 +2886,6 @@ async function buildAvatarFile(file, options = {}) {
     imageHeight,
     targetSize = 800,
     colorState,
-    keyState,
     quality = 0.8
   } = options;
 
@@ -2898,10 +2955,6 @@ async function buildAvatarFile(file, options = {}) {
     applyTemperatureOverlay(outCtx, targetSize, targetSize, colorState.temperature);
   }
 
-  if (keyState && keyState.enabled) {
-    applyColorKey(outCtx, targetSize, targetSize, keyState);
-  }
-
   outCtx.restore();
 
   const blob = await canvasToBlob(outCanvas, "image/webp", quality);
@@ -2942,6 +2995,152 @@ async function showResult(file) {
   "Format: " + file.name.split(".").pop().toUpperCase() + "\n" +
   "File size: " + formatSize(file.size) + "\n" +
   "Image size: " + meta.width + " × " + meta.height + " px";
+}
+
+/*
+================================
+ОБРАБОТКА МЫШИ ДЛЯ LASSO
+================================
+*/
+
+editCanvas.addEventListener("click", (event) => {
+  if (!sourceImage || activeMode !== "lasso" || lassoType.value !== "polygon" || lassoClosed)
+    return;
+
+  const point = getMousePosOnCanvas(event);
+  addLassoPoint(point, false);
+  drawEditor();
+});
+
+editCanvas.addEventListener("dblclick", (event) => {
+  if (!sourceImage || activeMode !== "lasso" || lassoType.value !== "polygon")
+    return;
+
+  event.preventDefault();
+  closeLassoSelection();
+});
+
+editCanvas.addEventListener("mousedown", (event) => {
+  if (!sourceImage || activeMode !== "lasso")
+    return;
+
+  const type = lassoType.value;
+  if (type === "polygon")
+    return;
+
+  event.preventDefault();
+  clearLassoSelection();
+  isDrawingLasso = true;
+
+  const point = getMousePosOnCanvas(event);
+  addLassoPoint(point, type === "magnetic");
+  drawEditor();
+});
+
+editCanvas.addEventListener("mousemove", (event) => {
+  if (!sourceImage || activeMode !== "lasso" || !isDrawingLasso)
+    return;
+
+  const point = getMousePosOnCanvas(event);
+  addLassoPoint(point, lassoType.value === "magnetic");
+  drawEditor();
+});
+
+window.addEventListener("mouseup", () => {
+  if (activeMode !== "lasso" || !isDrawingLasso)
+    return;
+
+  isDrawingLasso = false;
+  closeLassoSelection();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (activeMode !== "lasso")
+    return;
+
+  if (event.key === "Enter") {
+    event.preventDefault();
+    closeLassoSelection();
+  }
+
+  if (event.key === "Escape") {
+    event.preventDefault();
+    clearLassoSelection();
+    drawEditor();
+  }
+});
+
+function addLassoPoint(point, magnetic) {
+  let nextPoint = point;
+
+  if (magnetic)
+    nextPoint = findMagneticLassoPoint(point.x, point.y, magneticRadiusValueState);
+
+  const last = lassoPoints[lassoPoints.length - 1];
+  if (last) {
+    const dx = nextPoint.x - last.x;
+    const dy = nextPoint.y - last.y;
+    if (Math.sqrt(dx * dx + dy * dy) < 2)
+      return;
+  }
+
+  lassoPoints.push(nextPoint);
+}
+
+function findMagneticLassoPoint(canvasX, canvasY, radius) {
+  if (!lassoSampleCtx || !lassoSampleCanvas.width || !lassoSampleCanvas.height)
+    return { x: canvasX, y: canvasY };
+
+  const scaleX = lassoSampleCanvas.width / editCanvas.width;
+  const scaleY = lassoSampleCanvas.height / editCanvas.height;
+  const centerX = Math.round(canvasX * scaleX);
+  const centerY = Math.round(canvasY * scaleY);
+  const radiusX = Math.max(1, Math.round(radius * scaleX));
+  const radiusY = Math.max(1, Math.round(radius * scaleY));
+
+  const startX = clamp(centerX - radiusX, 1, lassoSampleCanvas.width - 2);
+  const startY = clamp(centerY - radiusY, 1, lassoSampleCanvas.height - 2);
+  const endX = clamp(centerX + radiusX, 1, lassoSampleCanvas.width - 2);
+  const endY = clamp(centerY + radiusY, 1, lassoSampleCanvas.height - 2);
+
+  const width = Math.max(3, endX - startX + 1);
+  const height = Math.max(3, endY - startY + 1);
+  const imageData = lassoSampleCtx.getImageData(startX - 1, startY - 1, width + 2, height + 2);
+  const data = imageData.data;
+  const stride = width + 2;
+
+  let bestScore = -1;
+  let bestX = centerX;
+  let bestY = centerY;
+
+  function luminance(px, py) {
+    const index = (py * stride + px) * 4;
+    return data[index] * 0.299 + data[index + 1] * 0.587 + data[index + 2] * 0.114;
+  }
+
+  for (let y = 1; y <= height; y++) {
+    for (let x = 1; x <= width; x++) {
+      const gx = luminance(x + 1, y) - luminance(x - 1, y);
+      const gy = luminance(x, y + 1) - luminance(x, y - 1);
+      const gradient = Math.abs(gx) + Math.abs(gy);
+
+      const imageX = startX + x - 1;
+      const imageY = startY + y - 1;
+      const distance = Math.hypot(imageX - centerX, imageY - centerY);
+      const score = gradient - distance * 2;
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestX = imageX;
+        bestY = imageY;
+      }
+    }
+  }
+
+  return {
+    x: bestX / scaleX,
+    y: bestY / scaleY
+  };
 }
 
 /*
@@ -3072,6 +3271,26 @@ editCanvas.addEventListener("wheel", (event) => {
 editCanvas.addEventListener("touchstart", (event) => {
   if (!sourceImage) return;
 
+  if (activeMode === "lasso") {
+    if (event.touches.length !== 1) return;
+    event.preventDefault();
+
+    const point = getTouchPosOnCanvas(event);
+
+    if (lassoType.value === "polygon") {
+      if (!lassoClosed) {
+        addLassoPoint(point, false);
+        drawEditor();
+      }
+    } else {
+      clearLassoSelection();
+      isDrawingLasso = true;
+      addLassoPoint(point, lassoType.value === "magnetic");
+      drawEditor();
+    }
+    return;
+  }
+
   if (activeMode === "crop") {
     if (event.touches.length !== 1) return;
 
@@ -3124,6 +3343,14 @@ editCanvas.addEventListener("touchstart", (event) => {
 editCanvas.addEventListener("touchmove", (event) => {
   if (!sourceImage) return;
 
+  if (activeMode === "lasso" && isDrawingLasso && event.touches.length === 1) {
+    event.preventDefault();
+    const point = getTouchPosOnCanvas(event);
+    addLassoPoint(point, lassoType.value === "magnetic");
+    drawEditor();
+    return;
+  }
+
   if (activeMode === "crop") {
     if (!isSelectingCrop || event.touches.length !== 1) return;
 
@@ -3160,6 +3387,11 @@ editCanvas.addEventListener("touchmove", (event) => {
 }, { passive: false });
 
 window.addEventListener("touchend", (event) => {
+  if (activeMode === "lasso" && isDrawingLasso && (!event.touches || event.touches.length === 0)) {
+    isDrawingLasso = false;
+    closeLassoSelection();
+  }
+
   if (activeMode === "crop" && isSelectingCrop) {
     isSelectingCrop = false;
     normalizeCropRect();
@@ -3596,7 +3828,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-KEY effect | v5.5.0
+Lasso effect| v5.6.0
   </div>
 
   <div class="row" id="build-down">
