@@ -912,6 +912,35 @@ const lassoSampleCanvas = document.createElement("canvas");
 const lassoSampleCtx = lassoSampleCanvas.getContext("2d", { willReadFrequently: true });
 
 /*
+РАСШИРЕННОЕ СОСТОЯНИЕ LASSO
+*/
+
+/* Точки, отменённые через Undo внутри LASSO */
+let lassoRedoPoints = [];
+
+/* Перетаскиваемая точка */
+let draggedLassoPointIndex = -1;
+
+/* Точка под курсором */
+let hoveredLassoPointIndex = -1;
+
+/* Координаты курсора */
+let lassoCursorX = 0;
+let lassoCursorY = 0;
+
+/* Радиус захвата точки в экранных пикселях */
+const lassoPointHitRadius = 10;
+
+/* Показывать полупрозрачную маску снаружи контура */
+let showLassoMask = true;
+
+/* Инверсия выделения */
+let lassoInverted = false;
+
+/* Отмена ложного клика */   
+let suppressLassoClick = false;   
+   
+/*
   СОСТОЯНИЕ RESIZE
   centerX / centerY — центр в координатах исходного изображения
   zoom — масштаб
@@ -1589,8 +1618,11 @@ lassoType.addEventListener("change", () => {
 });
 
 magneticRadius.addEventListener("input", () => {
-  magneticRadiusValueState = Number(magneticRadius.value) || 12;
-  magneticRadiusValue.textContent = magneticRadiusValueState + " px";
+  magneticRadiusValueState =
+    Number(magneticRadius.value) || 12;
+
+  magneticRadiusValue.textContent =
+    magneticRadiusValueState + " px";
 });
 
 closeLassoBtn.addEventListener("click", () => {
@@ -1602,11 +1634,28 @@ clearLassoBtn.addEventListener("click", () => {
   drawEditor();
 });
 
+/*
+ОЧИСТИТЬ LASSO
+*/
+
 function clearLassoSelection() {
   lassoPoints = [];
+  lassoRedoPoints = [];
+
   lassoClosed = false;
   isDrawingLasso = false;
+
+  draggedLassoPointIndex = -1;
+  hoveredLassoPointIndex = -1;
+  suppressLassoClick = false;
+  lassoInverted = false;
+
+  updateHistoryButtons();
 }
+
+/*
+ЗАМКНУТЬ LASSO
+*/
 
 function closeLassoSelection() {
   if (lassoPoints.length < 3) {
@@ -1616,10 +1665,537 @@ function closeLassoSelection() {
 
   lassoClosed = true;
   isDrawingLasso = false;
+
+  draggedLassoPointIndex = -1;
+  hoveredLassoPointIndex = -1;
+
   drawEditor();
+  updateHistoryButtons();
+
   setStatus("Lasso closed OK");
 }
 
+/*
+ДОБАВИТЬ ТОЧКУ
+*/
+
+function addLassoPoint(point) {
+  if (!point)
+    return;
+
+  /*
+    После добавления новой точки старая ветка Redo
+    больше не используется.
+  */
+  lassoRedoPoints.length = 0;
+
+  lassoPoints.push({
+    x: Math.round(point.x),
+    y: Math.round(point.y)
+  });
+
+  lassoClosed = false;
+  isDrawingLasso = true;
+
+  updateHistoryButtons();
+  drawEditor();
+}
+
+/*
+UNDO ОДНОЙ ТОЧКИ LASSO
+*/
+
+function undoLassoPoint() {
+  if (!lassoPoints.length)
+    return false;
+
+  const removedPoint =
+    lassoPoints.pop();
+
+  lassoRedoPoints.push(
+    removedPoint
+  );
+
+  lassoClosed = false;
+  isDrawingLasso =
+    lassoPoints.length > 0;
+
+  draggedLassoPointIndex = -1;
+  hoveredLassoPointIndex = -1;
+
+  updateHistoryButtons();
+  drawEditor();
+
+  setStatus("Lasso point undo OK");
+
+  return true;
+}
+
+/*
+REDO ОДНОЙ ТОЧКИ LASSO
+*/
+
+function redoLassoPoint() {
+  if (!lassoRedoPoints.length)
+    return false;
+
+  const restoredPoint =
+    lassoRedoPoints.pop();
+
+  lassoPoints.push(
+    restoredPoint
+  );
+
+  lassoClosed = false;
+  isDrawingLasso = true;
+
+  updateHistoryButtons();
+  drawEditor();
+
+  setStatus("Lasso point redo OK");
+
+  return true;
+}
+
+/*
+УДАЛИТЬ ВЫБРАННУЮ ТОЧКУ
+*/
+
+function deleteHoveredLassoPoint() {
+  if (
+    hoveredLassoPointIndex < 0 ||
+    hoveredLassoPointIndex >= lassoPoints.length
+  ) {
+    return false;
+  }
+
+  const removedPoint =
+    lassoPoints.splice(
+      hoveredLassoPointIndex,
+      1
+    )[0];
+
+  lassoRedoPoints.push(
+    removedPoint
+  );
+
+  hoveredLassoPointIndex = -1;
+  draggedLassoPointIndex = -1;
+
+  if (lassoPoints.length < 3) {
+    lassoClosed = false;
+  }
+
+  updateHistoryButtons();
+  drawEditor();
+
+  setStatus("Lasso point removed OK");
+
+  return true;
+}
+
+/*
+ИНВЕРТИРОВАТЬ LASSO
+*/
+
+function invertLassoSelection() {
+  if (!lassoClosed) {
+    setStatus("Close Lasso first");
+    return;
+  }
+
+  lassoInverted =
+    !lassoInverted;
+
+  drawEditor();
+
+  setStatus(
+    lassoInverted
+      ? "Lasso inverted OK"
+      : "Lasso normal OK"
+  );
+}
+
+/*
+================================
+ПОИСК ТОЧКИ LASSO
+================================
+*/
+
+function findLassoPointAt(canvasX, canvasY) {
+  for (
+    let index = lassoPoints.length - 1;
+    index >= 0;
+    index--
+  ) {
+    const point =
+      lassoPoints[index];
+
+    const dx =
+      point.x - canvasX;
+
+    const dy =
+      point.y - canvasY;
+
+    const distance =
+      Math.sqrt(
+        dx * dx +
+        dy * dy
+      );
+
+    /*
+      Радиус пересчитывать не надо:
+      координаты мыши уже переводятся
+      в реальные координаты canvas.
+    */
+    if (distance <= lassoPointHitRadius) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+/*
+================================
+ОТРИСОВКА LASSO
+================================
+*/
+
+function drawLassoOverlay() {
+  if (!lassoPoints.length)
+    return;
+
+  editCtx.save();
+
+  if (lassoClosed && lassoPoints.length >= 3) {
+    editCtx.fillStyle = "rgba(0, 0, 0, 0.42)";
+    editCtx.fillRect(0, 0, editCanvas.width, editCanvas.height);
+
+    editCtx.globalCompositeOperation = "destination-out";
+    traceLassoPath(editCtx, lassoPoints, true);
+    editCtx.fill();
+    editCtx.globalCompositeOperation = "source-over";
+
+    editCtx.save();
+    traceLassoPath(editCtx, lassoPoints, true);
+    editCtx.clip();
+    editCtx.filter = buildCanvasFilterString(colorState);
+    editCtx.drawImage(
+      sourceImage,
+      0, 0, imageNaturalWidth, imageNaturalHeight,
+      0, 0, editCanvas.width, editCanvas.height
+    );
+    editCtx.filter = "none";
+    if (colorState.temperature !== 0) {
+      applyTemperatureOverlay(editCtx, editCanvas.width, editCanvas.height, colorState.temperature);
+    }
+    if (keyState.enabled) {
+      applyColorKey(editCtx, editCanvas.width, editCanvas.height, keyState);
+    }
+    editCtx.restore();
+  }
+
+  editCtx.strokeStyle = lassoClosed ? "#16a34a" : "#2563eb";
+  editCtx.lineWidth = Math.max(2, Math.round(Math.min(editCanvas.width, editCanvas.height) / 400));
+  editCtx.setLineDash(lassoClosed ? [] : [8, 6]);
+  traceLassoPath(editCtx, lassoPoints, lassoClosed);
+  editCtx.stroke();
+  editCtx.setLineDash([]);
+
+  if (lassoType.value === "polygon") {
+    editCtx.fillStyle = "#ffffff";
+    editCtx.strokeStyle = "#2563eb";
+    editCtx.lineWidth = 2;
+
+    lassoPoints.forEach((point) => {
+      editCtx.beginPath();
+      editCtx.arc(point.x, point.y, 4, 0, Math.PI * 2);
+      editCtx.fill();
+      editCtx.stroke();
+    });
+  }
+
+  editCtx.restore();
+}
+
+function traceLassoPath(ctx, points, closePath) {
+  if (!points.length)
+    return;
+
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+
+  for (let i = 1; i < points.length; i++) {
+    ctx.lineTo(points[i].x, points[i].y);
+  }
+
+  if (closePath)
+    ctx.closePath();
+}
+   
+/*
+================================
+MOUSE LASSO
+================================
+*/
+
+editCanvas.addEventListener("mousemove", (event) => {
+  if (
+    !sourceImage ||
+    activeMode !== "lasso"
+  ) {
+    return;
+  }
+
+  const pos =
+    getMousePosOnCanvas(event);
+
+  lassoCursorX = pos.x;
+  lassoCursorY = pos.y;
+
+  /*
+    Перетаскиваем существующую точку.
+  */
+  if (draggedLassoPointIndex >= 0) {
+    lassoPoints[draggedLassoPointIndex] = {
+      x: Math.round(pos.x),
+      y: Math.round(pos.y)
+    };
+suppressLassoClick = true;
+    drawEditor();
+    return;
+  }
+
+  hoveredLassoPointIndex =
+    findLassoPointAt(
+      pos.x,
+      pos.y
+    );
+
+  editCanvas.style.cursor =
+    hoveredLassoPointIndex >= 0
+      ? "move"
+      : "crosshair";
+
+  drawEditor();
+});
+
+editCanvas.addEventListener("mousedown", (event) => {
+  if (
+    !sourceImage ||
+    activeMode !== "lasso"
+  ) {
+    return;
+  }
+suppressLassoClick = false;
+  const pos =
+    getMousePosOnCanvas(event);
+
+  const pointIndex =
+    findLassoPointAt(
+      pos.x,
+      pos.y
+    );
+
+  /*
+    Если нажали по существующей точке —
+    начинаем её перемещать.
+  */
+  if (pointIndex >= 0) {
+    draggedLassoPointIndex =
+      pointIndex;
+
+    event.preventDefault();
+  }
+});   
+
+window.addEventListener("mouseup", () => {
+  if (
+    activeMode === "lasso" &&
+    draggedLassoPointIndex >= 0
+  ) {
+    draggedLassoPointIndex = -1;
+
+    updateHistoryButtons();
+    drawEditor();
+
+    setStatus("Lasso point moved OK");
+  }
+});
+   
+  
+/*
+================================
+CLICK LASSO
+================================
+*/
+
+editCanvas.addEventListener("click", (event) => {
+  if (
+    !sourceImage ||
+    activeMode !== "lasso"
+  ) {
+    return;
+  }
+
+  /*
+    Если только что перетаскивали точку,
+    новую точку после отпускания мыши не добавляем.
+  */
+  if (suppressLassoClick) {
+  suppressLassoClick = false;
+  return;
+}
+
+  /*
+    Добавление отдельных точек используется
+    только для Polygon Lasso.
+    Freehand и Magnetic должны иметь
+    собственную логику рисования.
+  */
+  if (lassoType.value !== "polygon") {
+    return;
+  }
+
+  const pos =
+    getMousePosOnCanvas(event);
+
+  const firstPoint =
+    lassoPoints[0];
+
+  /*
+    Клик рядом с первой точкой
+    замыкает контур.
+  */
+  if (
+    firstPoint &&
+    lassoPoints.length >= 3
+  ) {
+    const dx =
+      firstPoint.x - pos.x;
+
+    const dy =
+      firstPoint.y - pos.y;
+
+    const distance =
+      Math.sqrt(
+        dx * dx +
+        dy * dy
+      );
+
+    if (
+      distance <=
+      lassoPointHitRadius * 1.5
+    ) {
+      closeLassoSelection();
+      return;
+    }
+  }
+
+  addLassoPoint(pos);
+});
+
+/*
+ДВОЙНОЙ КЛИК ЗАМЫКАЕТ LASSO
+*/
+
+editCanvas.addEventListener("dblclick", (event) => {
+  if (
+    !sourceImage ||
+    activeMode !== "lasso"
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+
+  if (lassoPoints.length >= 3) {
+    closeLassoSelection();
+  }
+});
+
+/*
+================================
+КЛАВИАТУРА LASSO
+================================
+*/
+
+document.addEventListener("keydown", (event) => {
+  if (activeMode !== "lasso")
+    return;
+
+  /*
+    Enter — замкнуть контур.
+  */
+  if (event.key === "Enter") {
+    event.preventDefault();
+    closeLassoSelection();
+    return;
+  }
+
+  /*
+    Escape — очистить текущий контур.
+  */
+  if (event.key === "Escape") {
+    event.preventDefault();
+
+    clearLassoSelection();
+    drawEditor();
+
+    setStatus("Lasso cleared");
+    return;
+  }
+
+  /*
+    Delete / Backspace —
+    удалить точку под курсором.
+  */
+  if (
+    event.key === "Delete" ||
+    event.key === "Backspace"
+  ) {
+    if (deleteHoveredLassoPoint()) {
+      event.preventDefault();
+    }
+
+    return;
+  }
+
+  /*
+    Ctrl+Z — Undo точки.
+  */
+  if (
+    event.ctrlKey &&
+    !event.shiftKey &&
+    event.key.toLowerCase() === "z"
+  ) {
+    event.preventDefault();
+    undoLassoPoint();
+    return;
+  }
+
+  /*
+    Ctrl+Y или Ctrl+Shift+Z — Redo точки.
+  */
+  if (
+    (
+      event.ctrlKey &&
+      event.key.toLowerCase() === "y"
+    ) ||
+    (
+      event.ctrlKey &&
+      event.shiftKey &&
+      event.key.toLowerCase() === "z"
+    )
+  ) {
+    event.preventDefault();
+    redoLassoPoint();
+  }
+});
+
+
+   
 /*
 ================================
 УПРАВЛЕНИЕ РЕАЛЬНЫМ RESIZE
@@ -1917,7 +2493,20 @@ makeAvatarBtn.addEventListener("click", async () => {
 */
 
 undoBtn.addEventListener("click", async () => {
-  if (historyIndex <= 0)
+ 
+  /*
+  Пока активен LASSO,
+  Undo удаляет последнюю точку.
+*/
+if (
+  activeMode === "lasso" &&
+  lassoPoints.length > 0
+) {
+  undoLassoPoint();
+  return;
+} 
+   
+   if (historyIndex <= 0)
     return;
 
   try {
@@ -1962,6 +2551,19 @@ undoBtn.addEventListener("click", async () => {
 */
 
 redoBtn.addEventListener("click", async () => {
+
+/*
+  Пока активен LASSO,
+  Redo возвращает отменённую точку.
+*/
+if (
+  activeMode === "lasso" &&
+  lassoRedoPoints.length > 0
+) {
+  redoLassoPoint();
+  return;
+}
+   
   if (
     historyIndex >=
     editHistory.length - 1
@@ -2120,7 +2722,7 @@ document
 
 /*
 ================================
-ЗАГРУЗИТЬ РЕЗУЛЬТАТ в ГАЛЕРЕЮ
+ЗАГРУЗИТЬ РЕЗУЛЬТАТ в ГАЛЕРЕЮ - для MVP Dating!!!
 ================================
 
 
@@ -2432,11 +3034,27 @@ function clearHistory() {
 }
 
 function updateHistoryButtons() {
-  undoBtn.disabled =
-    historyIndex <= 0;
+  const lassoIsActive =
+    activeMode === "lasso";
 
-  redoBtn.disabled =
-    historyIndex >= editHistory.length - 1;
+  /*
+    В режиме LASSO кнопки относятся к точкам.
+    В остальных режимах — к состояниям Apply.
+  */
+  if (lassoIsActive) {
+    undoBtn.disabled =
+      lassoPoints.length === 0;
+
+    redoBtn.disabled =
+      lassoRedoPoints.length === 0;
+  } else {
+    undoBtn.disabled =
+      historyIndex <= 0;
+
+    redoBtn.disabled =
+      historyIndex >=
+      editHistory.length - 1;
+  }
 
   backToOriginalBtn.disabled =
     !originalFile;
@@ -2694,84 +3312,6 @@ function drawCropOverlay() {
   editCtx.strokeStyle = "#2563eb";
   editCtx.lineWidth = 2;
   editCtx.strokeRect(cropRect.x, cropRect.y, cropRect.width, cropRect.height);
-}
-
-/*
-================================
-ОТРИСОВКА LASSO
-================================
-*/
-
-function drawLassoOverlay() {
-  if (!lassoPoints.length)
-    return;
-
-  editCtx.save();
-
-  if (lassoClosed && lassoPoints.length >= 3) {
-    editCtx.fillStyle = "rgba(0, 0, 0, 0.42)";
-    editCtx.fillRect(0, 0, editCanvas.width, editCanvas.height);
-
-    editCtx.globalCompositeOperation = "destination-out";
-    traceLassoPath(editCtx, lassoPoints, true);
-    editCtx.fill();
-    editCtx.globalCompositeOperation = "source-over";
-
-    editCtx.save();
-    traceLassoPath(editCtx, lassoPoints, true);
-    editCtx.clip();
-    editCtx.filter = buildCanvasFilterString(colorState);
-    editCtx.drawImage(
-      sourceImage,
-      0, 0, imageNaturalWidth, imageNaturalHeight,
-      0, 0, editCanvas.width, editCanvas.height
-    );
-    editCtx.filter = "none";
-    if (colorState.temperature !== 0) {
-      applyTemperatureOverlay(editCtx, editCanvas.width, editCanvas.height, colorState.temperature);
-    }
-    if (keyState.enabled) {
-      applyColorKey(editCtx, editCanvas.width, editCanvas.height, keyState);
-    }
-    editCtx.restore();
-  }
-
-  editCtx.strokeStyle = lassoClosed ? "#16a34a" : "#2563eb";
-  editCtx.lineWidth = Math.max(2, Math.round(Math.min(editCanvas.width, editCanvas.height) / 400));
-  editCtx.setLineDash(lassoClosed ? [] : [8, 6]);
-  traceLassoPath(editCtx, lassoPoints, lassoClosed);
-  editCtx.stroke();
-  editCtx.setLineDash([]);
-
-  if (lassoType.value === "polygon") {
-    editCtx.fillStyle = "#ffffff";
-    editCtx.strokeStyle = "#2563eb";
-    editCtx.lineWidth = 2;
-
-    lassoPoints.forEach((point) => {
-      editCtx.beginPath();
-      editCtx.arc(point.x, point.y, 4, 0, Math.PI * 2);
-      editCtx.fill();
-      editCtx.stroke();
-    });
-  }
-
-  editCtx.restore();
-}
-
-function traceLassoPath(ctx, points, closePath) {
-  if (!points.length)
-    return;
-
-  ctx.beginPath();
-  ctx.moveTo(points[0].x, points[0].y);
-
-  for (let i = 1; i < points.length; i++) {
-    ctx.lineTo(points[i].x, points[i].y);
-  }
-
-  if (closePath)
-    ctx.closePath();
 }
 
 /*
@@ -4018,7 +4558,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-LASSO + KEY | v5.7.0
+LASSO Advansed | v5.8.0
   </div>
 
   <div class="row" id="build-down">
