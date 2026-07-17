@@ -1064,6 +1064,8 @@ const eraserState = {
 let isErasing = false;
 let eraserLastX = 0;
 let eraserLastY = 0;
+let eraserCursorX = 0;
+let eraserCursorY = 0;   
 
 /*
   Постоянная маска стирания.
@@ -1766,17 +1768,14 @@ function updateModeUI() {
   colorPanel.classList.toggle("visible", activeMode === "color");
   keyPanel.classList.toggle("visible", activeMode === "key");
 
- if (activeMode === "crop") {
-  editCanvas.style.cursor =
-    "crosshair";
+if (activeMode === "crop") {
+  editCanvas.style.cursor = "crosshair";
 
 } else if (activeMode === "lasso") {
-  editCanvas.style.cursor =
-    "crosshair";
+  editCanvas.style.cursor = "crosshair";
 
 } else if (activeMode === "eraser") {
-  editCanvas.style.cursor =
-    "crosshair";
+  editCanvas.style.cursor = "none";
 
 } else if (activeMode === "zoom") {
   editCanvas.style.cursor =
@@ -1789,9 +1788,9 @@ function updateModeUI() {
         );
 
 } else {
-  editCanvas.style.cursor =
-    "default";
+  editCanvas.style.cursor = "default";
 }
+   
 updateEditorHint();   
 }
 
@@ -2255,6 +2254,48 @@ function applyEraserMaskToContext(
 
   targetCtx.restore();
 }
+
+/*
+================================
+ERASER CURSOR
+================================
+*/
+
+function drawEraserCursor() {
+
+    editCtx.save();
+
+    editCtx.lineWidth = 1.5;
+    editCtx.strokeStyle = "#ffffff";
+
+    if (eraserState.shape === "round") {
+
+        editCtx.beginPath();
+
+        editCtx.arc(
+            eraserCursorX,
+            eraserCursorY,
+            eraserState.size / 2,
+            0,
+            Math.PI * 2
+        );
+
+        editCtx.stroke();
+
+    } else {
+
+        editCtx.strokeRect(
+            eraserCursorX - eraserState.size / 2,
+            eraserCursorY - eraserState.size / 2,
+            eraserState.size,
+            eraserState.size
+        );
+
+    }
+
+    editCtx.restore();
+
+}
    
 /*
 ================================
@@ -2277,6 +2318,9 @@ editCanvas.addEventListener(
     const pos =
       getMousePosOnCanvas(event);
 
+eraserCursorX = pos.x;
+eraserCursorY = pos.y;
+     
     isErasing =
       true;
 
@@ -4096,6 +4140,10 @@ function drawEditor() {
     editCanvas.width,
     editCanvas.height
   );
+
+if (activeMode === "eraser") {
+    drawEraserCursor();
+}
 }
 
 function drawNormalEditor() {
@@ -5461,7 +5509,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-ERASER | v5.9.0
+ERASER Cursor| v5.9.1
   </div>
 
   <div class="row" id="build-down">
