@@ -1725,7 +1725,9 @@ function addLassoPoint(point) {
 }
 
 /*
+================================
 UNDO ОДНОЙ ТОЧКИ LASSO
+================================
 */
 
 function undoLassoPoint() {
@@ -1740,13 +1742,12 @@ function undoLassoPoint() {
   );
 
   lassoClosed = false;
-  isDrawingLasso =
-    lassoPoints.length > 0;
+  isDrawingLasso = false;
 
   draggedLassoPointIndex = -1;
   hoveredLassoPointIndex = -1;
+  suppressLassoClick = false;
 
-  updateHistoryButtons();
   drawEditor();
 
   setStatus("Lasso point undo OK");
@@ -1755,7 +1756,9 @@ function undoLassoPoint() {
 }
 
 /*
+================================
 REDO ОДНОЙ ТОЧКИ LASSO
+================================
 */
 
 function redoLassoPoint() {
@@ -1770,9 +1773,12 @@ function redoLassoPoint() {
   );
 
   lassoClosed = false;
-  isDrawingLasso = true;
+  isDrawingLasso = false;
 
-  updateHistoryButtons();
+  draggedLassoPointIndex = -1;
+  hoveredLassoPointIndex = -1;
+  suppressLassoClick = false;
+
   drawEditor();
 
   setStatus("Lasso point redo OK");
@@ -4586,7 +4592,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-LASSO Keyboard | v5.8.2
+LASSO undo\redo | v5.8.3
   </div>
 
   <div class="row" id="build-down">
