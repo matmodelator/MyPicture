@@ -2347,16 +2347,34 @@ editCanvas.addEventListener(
   (event) => {
     if (
       !sourceImage ||
-      activeMode !== "eraser" ||
-      !isErasing
+      activeMode !== "eraser"
     ) {
       return;
     }
 
-    event.preventDefault();
-
     const pos =
       getMousePosOnCanvas(event);
+
+    /*
+      Курсор Eraser должен двигаться
+      всегда, даже когда мышь не нажата.
+    */
+    eraserCursorX =
+      pos.x;
+
+    eraserCursorY =
+      pos.y;
+
+    /*
+      Если мышь не нажата —
+      только перерисовываем курсор.
+    */
+    if (!isErasing) {
+      drawEditor();
+      return;
+    }
+
+    event.preventDefault();
 
     drawEraserStroke(
       eraserLastX,
@@ -2372,7 +2390,6 @@ editCanvas.addEventListener(
       pos.y;
   }
 );
-
 window.addEventListener(
   "mouseup",
   () => {
@@ -5509,7 +5526,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-ERASER Cursor| v5.9.1
+mousemove| v5.9.2
   </div>
 
   <div class="row" id="build-down">
