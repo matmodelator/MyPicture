@@ -393,6 +393,18 @@ button.active {
   display: none;
 }
 
+.editor-hint {
+  min-height: 22px;
+  margin-bottom: 8px;
+  padding: 7px 10px;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.35;
+}
+   
 .note {
   margin-top: 8px;
   font-size: 13px;
@@ -574,46 +586,53 @@ The image is fitted into the page with selected margins and orientation.
       </div>
     </div>
 
-    <div class="toolbar">
-      <div class="left-tools">
+   <div class="toolbar">
 
-        <div class="tool-wrap" data-tip-wrap>
-          <button id="cropModeBtn" type="button">Crop</button>
-          <div class="tool-tip">Select a rectangular crop area.</div>
-        </div>
+  <div class="left-tools">
 
-        <div class="tool-wrap" data-tip-wrap>
-          <button id="lassoModeBtn" type="button">LASSO</button>
-          <div class="tool-tip">Polygon, Freehand or Magnetic Lasso selection.</div>
-        </div>
+    <div class="tool-wrap" data-tip-wrap>
+      <button id="cropModeBtn" type="button">Crop</button>
+      <div class="tool-tip">Select a rectangular crop area.</div>
+    </div>
 
-        <div class="tool-wrap" data-tip-wrap>
-          <button id="zoomModeBtn" type="button">Zoom</button>
-          <div class="tool-tip">Set center, zoom with wheel or pinch, drag the image when zoomed.</div>
-        </div>
+    <div class="tool-wrap" data-tip-wrap>
+      <button id="lassoModeBtn" type="button">LASSO</button>
+      <div class="tool-tip">Polygon, Freehand or Magnetic Lasso selection.</div>
+    </div>
 
-        <div class="tool-wrap" data-tip-wrap>
-          <button id="resizeModeBtn" type="button">Resize</button>
-          <div class="tool-tip">Change final image width and height, with or without aspect ratio.</div>
-        </div>
+    <div class="tool-wrap" data-tip-wrap>
+      <button id="eraserModeBtn" type="button">Eraser</button>
+      <div class="tool-tip">Erase pixels with a round or square brush.</div>
+    </div>
 
-        <div class="tool-wrap" data-tip-wrap>
-          <button id="colorModeBtn" type="button">Color</button>
-          <div class="tool-tip">Adjust brightness, saturation, contrast and temperature.</div>
-        </div>
+    <div class="tool-wrap" data-tip-wrap>
+      <button id="zoomModeBtn" type="button">Zoom</button>
+      <div class="tool-tip">Set center, zoom with wheel or pinch, drag the image when zoomed.</div>
+    </div>
 
-        <div class="tool-wrap" data-tip-wrap>
-          <button id="keyModeBtn" type="button">Key</button>
-          <div class="tool-tip">Remove a selected color with tolerance and edge softness.</div>
-        </div>
+    <div class="tool-wrap" data-tip-wrap>
+      <button id="resizeModeBtn" type="button">Resize</button>
+      <div class="tool-tip">Change final image width and height, with or without aspect ratio.</div>
+    </div>
 
-        <div class="tool-wrap" data-tip-wrap>
-          <button id="backToOriginalBtn" type="button" disabled>Back to original</button>
-          <div class="tool-tip">Return to the first uploaded image.</div>
-        </div>
-      </div>
+    <div class="tool-wrap" data-tip-wrap>
+      <button id="colorModeBtn" type="button">Color</button>
+      <div class="tool-tip">Adjust brightness, saturation, contrast and temperature.</div>
+    </div>
 
-      <div class="center-tools">
+    <div class="tool-wrap" data-tip-wrap>
+      <button id="keyModeBtn" type="button">Key</button>
+      <div class="tool-tip">Remove a selected color with tolerance and edge softness.</div>
+    </div>
+
+    <div class="tool-wrap" data-tip-wrap>
+      <button id="backToOriginalBtn" type="button" disabled>Back to original</button>
+      <div class="tool-tip">Return to the first uploaded image.</div>
+    </div>
+
+  </div>
+
+       <div class="center-tools">
         <div class="tool-wrap" data-tip-wrap>
           <button id="undoBtn" type="button" disabled>Undo</button>
           <div class="tool-tip">Undo one editing step.</div>
@@ -729,6 +748,8 @@ Outside the closed contour becomes transparent after Apply.
       </div>
     </div>
 
+     
+
     <!-- Панель Resize видна только при активном режиме Resize -->
     <div id="resizePanel" class="mode-panel">
       <div class="crop-grid">
@@ -809,9 +830,70 @@ With aspect ratio OFF, Width and Height are independent.
           <input id="keySoftnessRange" type="range" min="0" max="100" step="1" value="20">
           <div class="slider-value" id="keySoftnessValue">20</div>
         </div>
-
+</div>
       </div>
 
+<!-- Панель ERASER видна только при активном режиме ERASER -->
+
+<div id="eraserPanel" class="mode-panel">
+
+  <div class="field">
+    <label for="eraserSize">
+      Size:
+      <span id="eraserSizeValue">40 px</span>
+    </label>
+
+    <input
+      id="eraserSize"
+      type="range"
+      min="1"
+      max="200"
+      step="1"
+      value="40">
+  </div>
+
+  <div class="field">
+    <label for="eraserHardness">
+      Hardness:
+      <span id="eraserHardnessValue">100%</span>
+    </label>
+
+    <input
+      id="eraserHardness"
+      type="range"
+      min="0"
+      max="100"
+      step="1"
+      value="100">
+  </div>
+
+  <div class="field">
+    <label for="eraserOpacity">
+      Opacity:
+      <span id="eraserOpacityValue">100%</span>
+    </label>
+
+    <input
+      id="eraserOpacity"
+      type="range"
+      min="1"
+      max="100"
+      step="1"
+      value="100">
+  </div>
+
+  <div class="field">
+
+    <label>Shape</label>
+
+    <select id="eraserShape">
+      <option value="round">Round</option>
+      <option value="square">Square</option>
+    </select>
+
+  </div>
+
+       
       <div class="note">
 Key removes the selected color.
 Tolerance controls the color range.
@@ -856,8 +938,12 @@ Format: affects Save to disk.
     </div>
 
     <div class="panel">
-      <h3>Result</h3>
-      <div class="preview-box">
+  <h3>Result</h3>
+
+  <div id="editorHint" class="editor-hint"></div>
+
+  <div class="preview-box">
+     
         <div id="resultPlaceholder" class="note">Press Apply to make Result</div>
         <img id="resultPreview" alt="Result">
       </div>
@@ -961,6 +1047,35 @@ let lassoInverted = false;
 
 /* Отмена ложного клика */   
 let suppressLassoClick = false;   
+
+/*
+================================
+СОСТОЯНИЕ ERASER
+================================
+*/
+
+const eraserState = {
+  size: 40,
+  hardness: 100,
+  opacity: 100,
+  shape: "round"
+};
+
+let isErasing = false;
+let eraserLastX = 0;
+let eraserLastY = 0;
+
+/*
+  Постоянная маска стирания.
+
+  Белые непрозрачные участки маски означают:
+  эти пиксели изображения нужно удалить.
+*/
+const eraserMaskCanvas =
+  document.createElement("canvas");
+
+const eraserMaskCtx =
+  eraserMaskCanvas.getContext("2d");
    
 /*
   СОСТОЯНИЕ RESIZE
@@ -1106,6 +1221,33 @@ const keySoftnessRange = document.getElementById("keySoftnessRange");
 const keyToleranceValue = document.getElementById("keyToleranceValue");
 const keySoftnessValue = document.getElementById("keySoftnessValue");
 
+const eraserModeBtn =
+  document.getElementById("eraserModeBtn");
+
+const eraserPanel =
+  document.getElementById("eraserPanel");
+
+const eraserSize =
+  document.getElementById("eraserSize");
+
+const eraserSizeValue =
+  document.getElementById("eraserSizeValue");
+
+const eraserHardness =
+  document.getElementById("eraserHardness");
+
+const eraserHardnessValue =
+  document.getElementById("eraserHardnessValue");
+
+const eraserOpacity =
+  document.getElementById("eraserOpacity");
+
+const eraserOpacityValue =
+  document.getElementById("eraserOpacityValue");
+
+const eraserShape =
+  document.getElementById("eraserShape");
+   
 const editCanvas = document.getElementById("editCanvas");
 const editCtx = editCanvas.getContext("2d");
 
@@ -1113,6 +1255,7 @@ const resultPlaceholder = document.getElementById("resultPlaceholder");
 const resultPreview = document.getElementById("resultPreview");
 const originalInfo = document.getElementById("originalInfo");
 const resultInfo = document.getElementById("resultInfo");
+const editorHint = document.getElementById("editorHint");   
 const statusBox = document.getElementById("status");
 
 /* Все обёртки с подсказками */
@@ -1584,6 +1727,7 @@ function finishFileInput() {
 
 cropModeBtn.addEventListener("click", () => toggleMode("crop"));
 lassoModeBtn.addEventListener("click", () => toggleMode("lasso"));
+eraserModeBtn.addEventListener("click", () => toggleMode("eraser"));   
 zoomModeBtn.addEventListener("click", () => toggleMode("zoom"));
 resizeModeBtn.addEventListener("click", () => toggleMode("resize"));
 colorModeBtn.addEventListener("click", () => toggleMode("color"));
@@ -1613,22 +1757,707 @@ function updateModeUI() {
   resizeModeBtn.classList.toggle("active", activeMode === "resize");
   colorModeBtn.classList.toggle("active", activeMode === "color");
   keyModeBtn.classList.toggle("active", activeMode === "key");
-
+  eraserModeBtn.classList.toggle("active", activeMode === "eraser");
+   
+  eraserPanel.classList.toggle("visible", activeMode === "eraser");
   cropPanel.classList.toggle("visible", activeMode === "crop");
   lassoPanel.classList.toggle("visible", activeMode === "lasso");
   resizePanel.classList.toggle("visible", activeMode === "resize");
   colorPanel.classList.toggle("visible", activeMode === "color");
   keyPanel.classList.toggle("visible", activeMode === "key");
 
-  if (activeMode === "crop" || activeMode === "lasso") {
-    editCanvas.style.cursor = "crosshair";
-  } else if (activeMode === "zoom") {
-    editCanvas.style.cursor = isPanningResize ? "grabbing" : (resizeView.zoom > 1 ? "grab" : "pointer");
-  } else {
-    editCanvas.style.cursor = "default";
+ if (activeMode === "crop") {
+  editCanvas.style.cursor =
+    "crosshair";
+
+} else if (activeMode === "lasso") {
+  editCanvas.style.cursor =
+    "crosshair";
+
+} else if (activeMode === "eraser") {
+  editCanvas.style.cursor =
+    "crosshair";
+
+} else if (activeMode === "zoom") {
+  editCanvas.style.cursor =
+    isPanningResize
+      ? "grabbing"
+      : (
+          resizeView.zoom > 1
+            ? "grab"
+            : "pointer"
+        );
+
+} else {
+  editCanvas.style.cursor =
+    "default";
+}
+updateEditorHint();   
+}
+
+/*
+================================
+ПОДСКАЗКА АКТИВНОГО РЕЖИМА
+================================
+*/
+
+function updateEditorHint() {
+  if (!editorHint)
+    return;
+
+  if (activeMode === "lasso") {
+    editorHint.textContent =
+      "LASSO: Backspace — Undo point | \\ — Redo point | Enter — Close | Esc — Clear | Delete — Delete point";
+    return;
+  }
+
+  if (activeMode === "eraser") {
+    editorHint.textContent =
+      "ERASER: hold and drag to erase. Adjust Size, Hardness, Opacity and Shape.";
+    return;
+  }
+
+  if (activeMode === "crop") {
+    editorHint.textContent =
+      "CROP: drag on the Editor to select an area.";
+    return;
+  }
+
+  if (activeMode === "zoom") {
+    editorHint.textContent =
+      "ZOOM: use the mouse wheel to zoom and drag the image to move it.";
+    return;
+  }
+
+  if (activeMode === "resize") {
+    editorHint.textContent =
+      "RESIZE: set the final Width and Height.";
+    return;
+  }
+
+  if (activeMode === "color") {
+    editorHint.textContent =
+      "COLOR: adjust Brightness, Saturation, Contrast and Temperature.";
+    return;
+  }
+
+  if (activeMode === "key") {
+    editorHint.textContent =
+      "KEY: choose the removed color, then adjust Tolerance and Softness.";
+    return;
+  }
+
+  editorHint.textContent =
+    "Select an editing tool.";
+}
+   
+/*
+================================
+УПРАВЛЕНИЕ ERASER
+================================
+*/
+
+eraserSize.addEventListener("input", () => {
+  eraserState.size =
+    Math.max(
+      1,
+      Number(eraserSize.value) || 1
+    );
+
+  eraserSizeValue.textContent =
+    eraserState.size + " px";
+});
+
+eraserHardness.addEventListener("input", () => {
+  eraserState.hardness =
+    clamp(
+      Number(eraserHardness.value) || 0,
+      0,
+      100
+    );
+
+  eraserHardnessValue.textContent =
+    eraserState.hardness + "%";
+});
+
+eraserOpacity.addEventListener("input", () => {
+  eraserState.opacity =
+    clamp(
+      Number(eraserOpacity.value) || 1,
+      1,
+      100
+    );
+
+  eraserOpacityValue.textContent =
+    eraserState.opacity + "%";
+});
+
+eraserShape.addEventListener("change", () => {
+  eraserState.shape =
+    eraserShape.value;
+});
+
+/*
+================================
+РИСОВАНИЕ ERASER
+================================
+*/
+
+function drawEraserStroke(
+  fromX,
+  fromY,
+  toX,
+  toY
+) {
+  const size =
+    Math.max(1, eraserState.size);
+
+  const opacity =
+    clamp(
+      eraserState.opacity / 100,
+      0.01,
+      1
+    );
+
+  /*
+    Для круглой кисти рисуем непрерывную линию.
+  */
+  if (eraserState.shape === "round") {
+    drawRoundEraserStroke(
+      fromX,
+      fromY,
+      toX,
+      toY,
+      size,
+      opacity
+    );
+  }
+
+  /*
+    Для квадратной кисти ставим квадраты
+    вдоль всей траектории мыши.
+  */
+  else {
+    drawSquareEraserStroke(
+      fromX,
+      fromY,
+      toX,
+      toY,
+      size,
+      opacity
+    );
+  }
+
+  drawEditor();
+}
+
+/*
+================================
+КРУГЛАЯ КИСТЬ
+================================
+*/
+
+function drawRoundEraserStroke(
+  fromX,
+  fromY,
+  toX,
+  toY,
+  size,
+  opacity
+) {
+  const hardness =
+    clamp(
+      eraserState.hardness / 100,
+      0,
+      1
+    );
+
+  /*
+    При полной жёсткости достаточно линии
+    с круглым окончанием.
+  */
+  if (hardness >= 0.99) {
+    eraserMaskCtx.save();
+
+    eraserMaskCtx.globalCompositeOperation =
+      "source-over";
+
+    eraserMaskCtx.globalAlpha =
+      opacity;
+
+    eraserMaskCtx.strokeStyle =
+      "#ffffff";
+
+    eraserMaskCtx.lineWidth =
+      size;
+
+    eraserMaskCtx.lineCap =
+      "round";
+
+    eraserMaskCtx.lineJoin =
+      "round";
+
+    eraserMaskCtx.beginPath();
+
+    eraserMaskCtx.moveTo(
+      fromX,
+      fromY
+    );
+
+    eraserMaskCtx.lineTo(
+      toX,
+      toY
+    );
+
+    eraserMaskCtx.stroke();
+
+    eraserMaskCtx.restore();
+
+    return;
+  }
+
+  /*
+    Мягкая кисть:
+    ставим градиентные отпечатки вдоль линии.
+  */
+  const dx =
+    toX - fromX;
+
+  const dy =
+    toY - fromY;
+
+  const distance =
+    Math.sqrt(
+      dx * dx +
+      dy * dy
+    );
+
+  const step =
+    Math.max(
+      1,
+      size * 0.12
+    );
+
+  const count =
+    Math.max(
+      1,
+      Math.ceil(distance / step)
+    );
+
+  for (
+    let index = 0;
+    index <= count;
+    index++
+  ) {
+    const ratio =
+      index / count;
+
+    const x =
+      fromX + dx * ratio;
+
+    const y =
+      fromY + dy * ratio;
+
+    drawSoftEraserDot(
+      x,
+      y,
+      size,
+      hardness,
+      opacity
+    );
   }
 }
 
+/*
+================================
+МЯГКИЙ КРУГЛЫЙ ОТПЕЧАТОК
+================================
+*/
+
+function drawSoftEraserDot(
+  x,
+  y,
+  size,
+  hardness,
+  opacity
+) {
+  const radius =
+    size / 2;
+
+  const hardRadius =
+    Math.max(
+      0,
+      radius * hardness
+    );
+
+  const gradient =
+    eraserMaskCtx.createRadialGradient(
+      x,
+      y,
+      hardRadius,
+      x,
+      y,
+      radius
+    );
+
+  gradient.addColorStop(
+    0,
+    `rgba(255,255,255,${opacity})`
+  );
+
+  /*
+    Если hardness равен нулю,
+    переход начинается прямо от центра.
+  */
+  if (hardness > 0) {
+    gradient.addColorStop(
+      hardness,
+      `rgba(255,255,255,${opacity})`
+    );
+  }
+
+  gradient.addColorStop(
+    1,
+    "rgba(255,255,255,0)"
+  );
+
+  eraserMaskCtx.save();
+
+  eraserMaskCtx.globalCompositeOperation =
+    "source-over";
+
+  eraserMaskCtx.fillStyle =
+    gradient;
+
+  eraserMaskCtx.beginPath();
+
+  eraserMaskCtx.arc(
+    x,
+    y,
+    radius,
+    0,
+    Math.PI * 2
+  );
+
+  eraserMaskCtx.fill();
+
+  eraserMaskCtx.restore();
+}
+
+/*
+================================
+КВАДРАТНАЯ КИСТЬ
+================================
+*/
+
+function drawSquareEraserStroke(
+  fromX,
+  fromY,
+  toX,
+  toY,
+  size,
+  opacity
+) {
+  const dx =
+    toX - fromX;
+
+  const dy =
+    toY - fromY;
+
+  const distance =
+    Math.sqrt(
+      dx * dx +
+      dy * dy
+    );
+
+  const step =
+    Math.max(
+      1,
+      size * 0.25
+    );
+
+  const count =
+    Math.max(
+      1,
+      Math.ceil(distance / step)
+    );
+
+  eraserMaskCtx.save();
+
+  eraserMaskCtx.globalCompositeOperation =
+    "source-over";
+
+  eraserMaskCtx.globalAlpha =
+    opacity;
+
+  eraserMaskCtx.fillStyle =
+    "#ffffff";
+
+  for (
+    let index = 0;
+    index <= count;
+    index++
+  ) {
+    const ratio =
+      index / count;
+
+    const x =
+      fromX + dx * ratio;
+
+    const y =
+      fromY + dy * ratio;
+
+    eraserMaskCtx.fillRect(
+      x - size / 2,
+      y - size / 2,
+      size,
+      size
+    );
+  }
+
+  eraserMaskCtx.restore();
+}
+
+/*
+================================
+ПРИМЕНИТЬ МАСКУ ERASER
+================================
+*/
+
+function applyEraserMaskToContext(
+  targetCtx,
+  targetWidth,
+  targetHeight
+) {
+  if (
+    !eraserMaskCanvas.width ||
+    !eraserMaskCanvas.height
+  ) {
+    return;
+  }
+
+  targetCtx.save();
+
+  targetCtx.globalCompositeOperation =
+    "destination-out";
+
+  targetCtx.drawImage(
+    eraserMaskCanvas,
+    0,
+    0,
+    eraserMaskCanvas.width,
+    eraserMaskCanvas.height,
+    0,
+    0,
+    targetWidth,
+    targetHeight
+  );
+
+  targetCtx.restore();
+}
+   
+/*
+================================
+MOUSE ERASER
+================================
+*/
+
+editCanvas.addEventListener(
+  "mousedown",
+  (event) => {
+    if (
+      !sourceImage ||
+      activeMode !== "eraser"
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const pos =
+      getMousePosOnCanvas(event);
+
+    isErasing =
+      true;
+
+    eraserLastX =
+      pos.x;
+
+    eraserLastY =
+      pos.y;
+
+    /*
+      Даже простой клик должен оставить след.
+    */
+    drawEraserStroke(
+      pos.x,
+      pos.y,
+      pos.x,
+      pos.y
+    );
+  }
+);
+
+editCanvas.addEventListener(
+  "mousemove",
+  (event) => {
+    if (
+      !sourceImage ||
+      activeMode !== "eraser" ||
+      !isErasing
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const pos =
+      getMousePosOnCanvas(event);
+
+    drawEraserStroke(
+      eraserLastX,
+      eraserLastY,
+      pos.x,
+      pos.y
+    );
+
+    eraserLastX =
+      pos.x;
+
+    eraserLastY =
+      pos.y;
+  }
+);
+
+window.addEventListener(
+  "mouseup",
+  () => {
+    if (!isErasing)
+      return;
+
+    isErasing =
+      false;
+
+    setStatus(
+      "Eraser stroke OK"
+    );
+  }
+);
+
+/*
+================================
+TOUCH ERASER для телефона
+================================
+*/
+
+editCanvas.addEventListener(
+  "touchstart",
+  (event) => {
+    if (
+      !sourceImage ||
+      activeMode !== "eraser" ||
+      event.touches.length !== 1
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const pos =
+      getTouchPosOnCanvas(event);
+
+    isErasing =
+      true;
+
+    eraserLastX =
+      pos.x;
+
+    eraserLastY =
+      pos.y;
+
+    drawEraserStroke(
+      pos.x,
+      pos.y,
+      pos.x,
+      pos.y
+    );
+  },
+  { passive: false }
+);
+
+editCanvas.addEventListener(
+  "touchmove",
+  (event) => {
+    if (
+      !sourceImage ||
+      activeMode !== "eraser" ||
+      !isErasing ||
+      event.touches.length !== 1
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const pos =
+      getTouchPosOnCanvas(event);
+
+    drawEraserStroke(
+      eraserLastX,
+      eraserLastY,
+      pos.x,
+      pos.y
+    );
+
+    eraserLastX =
+      pos.x;
+
+    eraserLastY =
+      pos.y;
+  },
+  { passive: false }
+);
+
+window.addEventListener(
+  "touchend",
+  () => {
+    if (
+      activeMode !== "eraser" ||
+      !isErasing
+    ) {
+      return;
+    }
+
+    isErasing =
+      false;
+
+    setStatus(
+      "Eraser stroke OK"
+    );
+  },
+  { passive: false }
+);
+   
+/*
+================================
+ОЧИСТИТЬ ERASER
+================================
+*/
+
+function clearEraserMask() {
+  eraserMaskCtx.clearRect(
+    0,
+    0,
+    eraserMaskCanvas.width,
+    eraserMaskCanvas.height
+  );
+
+  isErasing =
+    false;
+
+  drawEditor();
+}
+   
 /*
 ================================
 УПРАВЛЕНИЕ LASSO
@@ -2238,7 +3067,8 @@ document.addEventListener("keydown", (event) => {
   }
 
 });
-   
+
+ 
 /*
 ================================
 УПРАВЛЕНИЕ РЕАЛЬНЫМ RESIZE
@@ -3121,6 +3951,23 @@ async function loadSourceFileIntoEditor(file) {
 */
 editCanvas.width = img.width;
 editCanvas.height = img.height;
+
+   /*
+  Маска Eraser всегда имеет тот же размер,
+  что и текущий Editor.
+*/
+eraserMaskCanvas.width =
+  img.width;
+
+eraserMaskCanvas.height =
+  img.height;
+
+eraserMaskCtx.clearRect(
+  0,
+  0,
+  eraserMaskCanvas.width,
+  eraserMaskCanvas.height
+);
    
   editCanvas.style.display = "block";
 
@@ -3228,15 +4075,27 @@ function isResizeDefault() {
 */
 
 function drawEditor() {
-  if (!sourceImage) return;
+  if (!sourceImage)
+    return;
 
-  editCtx.clearRect(0, 0, editCanvas.width, editCanvas.height);
+  editCtx.clearRect(
+    0,
+    0,
+    editCanvas.width,
+    editCanvas.height
+  );
 
   if (activeMode === "zoom") {
     drawResizeEditor();
   } else {
     drawNormalEditor();
   }
+
+  applyEraserMaskToContext(
+    editCtx,
+    editCanvas.width,
+    editCanvas.height
+  );
 }
 
 function drawNormalEditor() {
@@ -3616,6 +4475,16 @@ async function buildFinalFile(file, options = {}) {
     }
   }
 
+/*
+  Маску Eraser переносим в итоговый canvas.
+  Она автоматически масштабируется под Result.
+*/
+applyEraserMaskToContext(
+  outCtx,
+  finalWidth,
+  finalHeight
+);
+   
   if (keyState && keyState.enabled) {
     applyColorKey(outCtx, finalWidth, finalHeight, keyState);
   }
@@ -4592,7 +5461,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-LASSO undo\redo | v5.8.3
+ERASER | v5.9.0
   </div>
 
   <div class="row" id="build-down">
