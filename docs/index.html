@@ -426,6 +426,14 @@ button.active {
   gap: 14px 18px;
 }
 
+/* ---------- Keyboard hint ---------- */
+
+.hint {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.35;
+}
+   
 .slider-wrap {
   display: flex;
   flex-direction: column;
@@ -697,6 +705,20 @@ The image is fitted into the page with selected margins and orientation.
           </div>
         </div>
 
+<div class="field">
+      <label>Keyboard</label>
+
+      <div class="hint">
+        <b>Backspace</b> — Undo last point<br>
+        <b>|</b> — Redo last point<br>
+        <b>Enter</b> — Close contour<br>
+        <b>Esc</b> — Clear contour<br>
+        <b>Delete</b> — Delete point<br>
+        <b>Space</b> — Move image (Zoom)
+      </div>
+    </div>
+
+         
       </div>
 
       <div class="note">
@@ -2123,79 +2145,93 @@ editCanvas.addEventListener("dblclick", (event) => {
 */
 
 document.addEventListener("keydown", (event) => {
+
   if (activeMode !== "lasso")
     return;
 
   /*
-    Enter — замкнуть контур.
+    Backspace
+    Удалить последнюю точку.
   */
-  if (event.key === "Enter") {
+  if (event.key === "Backspace") {
     event.preventDefault();
-    closeLassoSelection();
+
+    undoLassoPoint();
+
     return;
   }
 
   /*
-    Escape — очистить текущий контур.
+    |
+    Вернуть последнюю отменённую точку.
+  */
+  if (
+    event.key === "|" ||
+    event.code === "Backslash"
+  ) {
+    event.preventDefault();
+
+    redoLassoPoint();
+
+    return;
+  }
+
+  /*
+    Enter
+    Замкнуть контур.
+  */
+  if (event.key === "Enter") {
+    event.preventDefault();
+
+    closeLassoSelection();
+
+    return;
+  }
+
+  /*
+    Escape
+    Очистить весь контур.
   */
   if (event.key === "Escape") {
     event.preventDefault();
 
     clearLassoSelection();
+
     drawEditor();
 
     setStatus("Lasso cleared");
-    return;
-  }
-
-  /*
-    Delete / Backspace —
-    удалить точку под курсором.
-  */
-  if (
-    event.key === "Delete" ||
-    event.key === "Backspace"
-  ) {
-    if (deleteHoveredLassoPoint()) {
-      event.preventDefault();
-    }
 
     return;
   }
 
   /*
-    Ctrl+Z — Undo точки.
+    Delete
+    Удалить точку под курсором.
   */
-  if (
-    event.ctrlKey &&
-    !event.shiftKey &&
-    event.key.toLowerCase() === "z"
-  ) {
+  if (event.key === "Delete") {
     event.preventDefault();
-    undoLassoPoint();
+
+    deleteHoveredLassoPoint();
+
     return;
   }
 
   /*
-    Ctrl+Y или Ctrl+Shift+Z — Redo точки.
+    Space
+    Пока резервируется
+    под Pan (перемещение изображения).
   */
-  if (
-    (
-      event.ctrlKey &&
-      event.key.toLowerCase() === "y"
-    ) ||
-    (
-      event.ctrlKey &&
-      event.shiftKey &&
-      event.key.toLowerCase() === "z"
-    )
-  ) {
+  if (event.code === "Space") {
     event.preventDefault();
-    redoLassoPoint();
+
+    /*
+      Будущий Pan Tool.
+    */
+
+    return;
   }
+
 });
-
-
    
 /*
 ================================
@@ -3041,29 +3077,12 @@ function clearHistory() {
 */
 
 function updateHistoryButtons() {
-  /*
-    В режиме LASSO:
-    Undo / Redo работают по точкам контура.
-  */
-  if (activeMode === "lasso") {
-    undoBtn.disabled =
-      lassoPoints.length === 0;
+  undoBtn.disabled =
+    historyIndex <= 0;
 
-    redoBtn.disabled =
-      lassoRedoPoints.length === 0;
-  }
-
-  /*
-    Во всех остальных режимах:
-    Undo / Redo работают по состояниям Apply.
-  */
-  else {
-    undoBtn.disabled =
-      historyIndex <= 0;
-
-    redoBtn.disabled =
-      historyIndex >= editHistory.length - 1;
-  }
+  redoBtn.disabled =
+    historyIndex >=
+    editHistory.length - 1;
 
   backToOriginalBtn.disabled =
     !originalFile;
@@ -4567,7 +4586,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-updateHistoryButtons | v5.8.1
+LASSO Keyboard | v5.8.2
   </div>
 
   <div class="row" id="build-down">
