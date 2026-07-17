@@ -1581,6 +1581,7 @@ function toggleMode(mode) {
   activeMode = (activeMode === mode) ? null : mode;
   updateModeUI();
   drawEditor();
+  updateHistoryButtons(); 
 }
 
 function updateModeUI() {
@@ -3033,27 +3034,35 @@ function clearHistory() {
   updateHistoryButtons();
 }
 
-function updateHistoryButtons() {
-  const lassoIsActive =
-    activeMode === "lasso";
+/*
+================================
+ОБНОВИТЬ КНОПКИ UNDO / REDO
+================================
+*/
 
+function updateHistoryButtons() {
   /*
-    В режиме LASSO кнопки относятся к точкам.
-    В остальных режимах — к состояниям Apply.
+    В режиме LASSO:
+    Undo / Redo работают по точкам контура.
   */
-  if (lassoIsActive) {
+  if (activeMode === "lasso") {
     undoBtn.disabled =
       lassoPoints.length === 0;
 
     redoBtn.disabled =
       lassoRedoPoints.length === 0;
-  } else {
+  }
+
+  /*
+    Во всех остальных режимах:
+    Undo / Redo работают по состояниям Apply.
+  */
+  else {
     undoBtn.disabled =
       historyIndex <= 0;
 
     redoBtn.disabled =
-      historyIndex >=
-      editHistory.length - 1;
+      historyIndex >= editHistory.length - 1;
   }
 
   backToOriginalBtn.disabled =
@@ -4558,7 +4567,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-LASSO Advansed | v5.8.0
+updateHistoryButtons | v5.8.1
   </div>
 
   <div class="row" id="build-down">
