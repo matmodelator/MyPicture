@@ -419,11 +419,47 @@ button.active {
 #editCanvas {
   max-width: 100%;
   display: none;
-  background: #ddd;
+
+  /*
+    Прозрачные пиксели Editor
+    показываются шахматной сеткой.
+  */
+  background-color: #ffffff;
+
+  background-image:
+    linear-gradient(
+      45deg,
+      #d1d5db 25%,
+      transparent 25%
+    ),
+    linear-gradient(
+      -45deg,
+      #d1d5db 25%,
+      transparent 25%
+    ),
+    linear-gradient(
+      45deg,
+      transparent 75%,
+      #d1d5db 75%
+    ),
+    linear-gradient(
+      -45deg,
+      transparent 75%,
+      #d1d5db 75%
+    );
+
+  background-size: 24px 24px;
+
+  background-position:
+    0 0,
+    0 12px,
+    12px -12px,
+    -12px 0;
+
   cursor: default;
   touch-action: none;
 }
-
+   
 #resultPreview {
   max-width: 100%;
   max-height: 720px;
@@ -974,12 +1010,12 @@ Format: affects Save to disk.
       <div class="info" id="originalInfo"></div>
     </div>
 
+<div id="editorHint" class="editor-hint"></div>
+     
     <div class="panel">
   <h3>Result</h3>
 
-  <div id="editorHint" class="editor-hint"></div>
-
-  <div class="preview-box">
+       <div class="preview-box">
      
         <div id="resultPlaceholder" class="note">Press Apply to make Result</div>
         <img id="resultPreview" alt="Result">
@@ -5563,7 +5599,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-chess board| v5.9.3
+editor chess board| v5.9.4
   </div>
 
   <div class="row" id="build-down">
