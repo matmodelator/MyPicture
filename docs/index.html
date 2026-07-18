@@ -1078,6 +1078,9 @@ Use as source: loads Result back into Editor.
 Avatar: creates a round avatar and also loads it back into the editor.
 Format: affects Save to disk.
     </div>
+
+<div id="editorHint" class="editor-hint"></div>
+     
   </div>
 
   <div class="row">
@@ -1088,9 +1091,7 @@ Format: affects Save to disk.
       </div>
       <div class="info" id="originalInfo"></div>
     </div>
-
-<div id="editorHint" class="editor-hint"></div>
-     
+    
     <div class="panel">
   <h3>Result</h3>
 
@@ -2731,9 +2732,6 @@ function clearEraserMask() {
     eraserMaskCanvas.height
   );
 
-paintCanvas.width = img.width;
-paintCanvas.height = img.height;
-paintCtx.clearRect(0, 0, img.width, img.height);
 
   isErasing =
     false;
@@ -2766,58 +2764,284 @@ fillAlphaTolerance.addEventListener("input", () => {
   fillAlphaToleranceValue.textContent = String(fillState.alphaTolerance);
 });
 
-applyFillBtn.addEventListener("click", () => {
-  if (!sourceImage) return;
+applyFillBtn.addEventListener("click", async () => {
+  if (!sourceImage)
+    return;
 
-  const color = hexToRgba(fillState.color, fillState.opacity / 100);
+  try {
+    clearStatus();
 
-  if (fillState.target === "lasso") {
-    if (!lassoClosed || lassoPoints.length < 3) {
-      setStatus("Close LASSO first");
-      return;
-    }
+    const color =
+      hexToRgba(
+        fillState.color,
+        fillState.opacity / 100
+      );
 
-    paintCtx.save();
-    traceLassoPath(paintCtx, lassoPoints, true);
-    paintCtx.clip();
-    paintCtx.fillStyle = color;
-    paintCtx.fillRect(0, 0, paintCanvas.width, paintCanvas.height);
-    paintCtx.restore();
-  } else if (fillState.target === "whole") {
-    paintCtx.fillStyle = color;
-    paintCtx.fillRect(0, 0, paintCanvas.width, paintCanvas.height);
-  } else {
-    const temp = document.createElement("canvas");
-    temp.width = editCanvas.width;
-    temp.height = editCanvas.height;
-    const tempCtx = temp.getContext("2d");
-
-    tempCtx.drawImage(sourceImage, 0, 0, imageNaturalWidth, imageNaturalHeight, 0, 0, temp.width, temp.height);
-    tempCtx.save();
-    tempCtx.globalCompositeOperation = "destination-out";
-    tempCtx.drawImage(eraserMaskCanvas, 0, 0);
-    tempCtx.restore();
-
-    const srcData = tempCtx.getImageData(0, 0, temp.width, temp.height);
-    const fillData = paintCtx.createImageData(temp.width, temp.height);
-    const rgb = hexToRgb(fillState.color);
-    const alpha = Math.round(255 * fillState.opacity / 100);
-
-    for (let i = 0; i < srcData.data.length; i += 4) {
-      if (srcData.data[i + 3] <= fillState.alphaTolerance) {
-        fillData.data[i] = rgb.r;
-        fillData.data[i + 1] = rgb.g;
-        fillData.data[i + 2] = rgb.b;
-        fillData.data[i + 3] = alpha;
+    if (fillState.target === "lasso") {
+      if (
+        !lassoClosed ||
+        lassoPoints.length < 3
+      ) {
+        setStatus("Close LASSO first");
+        return;
       }
+
+      paintCtx.save();
+      traceLassoPath(
+        paintCtx,
+        lassoPoints,
+        true
+      );
+      paintCtx.clip();
+      paintCtx.fillStyle = color;
+      paintCtx.fillRect(
+        0,
+        0,
+        paintCanvas.width,
+        paintCanvas.height
+      );
+      paintCtx.restore();
+
+    } else if (fillState.target === "whole") {
+      paintCtx.save();
+      paintCtx.fillStyle = color;
+      paintCtx.fillRect(
+        0,
+        0,
+        paintCanvas.width,
+        paintCanvas.height
+      );
+      paintCtx.restore();
+
+    } else {
+      /*
+        Строим реальное текущее изображение без шахматной подложки.
+        Проверяем именно alpha каждого пикселя.
+      */
+      const tempCanvas =
+        document.createElement("canvas");
+
+      tempCanvas.width = editCanvas.width;
+      tempCanvas.height = editCanvas.height;
+
+      const tempCtx =
+        tempCanvas.getContext("2d", {
+          willReadFrequently: true
+        });
+
+      tempCtx.clearRect(
+        0,
+        0,
+        tempCanvas.width,
+        tempCanvas.height
+      );
+
+      tempCtx.filter =
+        buildCanvasFilterString(colorState);
+
+      tempCtx.drawImage(
+        sourceImage,
+        0,
+        0,
+        imageNaturalWidth,
+        imageNaturalHeight,
+        0,
+        0,
+        tempCanvas.width,
+        tempCanvas.height
+      );
+
+      tempCtx.filter = "none";
+
+      if (colorState.temperature !== 0) {
+        applyTemperatureOverlay(
+          tempCtx,
+          tempCanvas.width,
+          tempCanvas.height,
+          colorState.temperature
+        );
+      }
+
+      if (keyState.enabled) {
+        applyColorKey(
+          tempCtx,
+          tempCanvas.width,
+          tempCanvas.height,
+          keyState
+        );
+      }
+
+      tempCtx.save();
+      tempCtx.globalCompositeOperation =
+        "destination-out";
+      tempCtx.drawImage(
+        eraserMaskCanvas,
+        0,
+        0,
+        eraserMaskCanvas.width,
+        eraserMaskCanvas.height,
+        0,
+        0,
+        tempCanvas.width,
+        tempCanvas.height
+      );
+      tempCtx.restore();
+
+      /*
+        Уже нарисованный Brush тоже считается непрозрачным.
+      */
+      tempCtx.drawImage(
+        paintCanvas,
+        0,
+        0,
+        paintCanvas.width,
+        paintCanvas.height,
+        0,
+        0,
+        tempCanvas.width,
+        tempCanvas.height
+      );
+
+      const srcData =
+        tempCtx.getImageData(
+          0,
+          0,
+          tempCanvas.width,
+          tempCanvas.height
+        );
+
+      const fillCanvas =
+        document.createElement("canvas");
+
+      fillCanvas.width = tempCanvas.width;
+      fillCanvas.height = tempCanvas.height;
+
+      const fillCtx =
+        fillCanvas.getContext("2d");
+
+      const fillData =
+        fillCtx.createImageData(
+          fillCanvas.width,
+          fillCanvas.height
+        );
+
+      const rgb =
+        hexToRgb(fillState.color);
+
+      const fillAlpha =
+        Math.round(
+          255 * fillState.opacity / 100
+        );
+
+      const alphaLimit =
+        clamp(
+          Number(fillState.alphaTolerance) || 0,
+          0,
+          255
+        );
+
+      for (
+        let index = 0;
+        index < srcData.data.length;
+        index += 4
+      ) {
+        const sourceAlpha =
+          srcData.data[index + 3];
+
+        if (sourceAlpha <= alphaLimit) {
+          fillData.data[index] = rgb.r;
+          fillData.data[index + 1] = rgb.g;
+          fillData.data[index + 2] = rgb.b;
+          fillData.data[index + 3] = fillAlpha;
+        }
+      }
+
+      fillCtx.putImageData(
+        fillData,
+        0,
+        0
+      );
+
+      /*
+        Не заменяем paintCanvas целиком,
+        а добавляем заливку поверх существующего слоя.
+      */
+      paintCtx.save();
+      paintCtx.globalCompositeOperation =
+        "source-over";
+      paintCtx.drawImage(
+        fillCanvas,
+        0,
+        0
+      );
+      paintCtx.restore();
     }
 
-    paintCtx.putImageData(fillData, 0, 0);
-  }
+    drawEditor();
 
-  drawEditor();
-  setStatus("Fill OK");
+    /*
+      Fill сразу фиксируется как полноценный шаг истории.
+    */
+    await commitCurrentEditorToHistory(
+      "Fill OK"
+    );
+
+  } catch (error) {
+    setStatus(
+      "ERROR " +
+      (error.message || error)
+    );
+  }
 });
+
+/*
+================================
+ЗАПИСАТЬ ТЕКУЩИЙ EDITOR В ИСТОРИЮ
+================================
+*/
+
+async function commitCurrentEditorToHistory(statusText) {
+  processedFile =
+    await buildFinalFile(sourceFile, {
+      useCrop: false,
+      cropRectCanvas: null,
+      useLasso: false,
+      lassoPointsCanvas: [],
+      canvasWidth: editCanvas.width,
+      canvasHeight: editCanvas.height,
+      imageWidth: imageNaturalWidth,
+      imageHeight: imageNaturalHeight,
+      useZoom: false,
+      useOutputResize: false,
+      targetWidth: imageNaturalWidth,
+      targetHeight: imageNaturalHeight,
+      colorState,
+      keyState,
+      quality:
+        Number(qualityInput.value) || 0.75
+    });
+
+  await showResult(processedFile);
+
+  sourceFile = processedFile;
+  pushHistory(sourceFile);
+
+  await loadSourceFileIntoEditor(
+    sourceFile
+  );
+
+  resetAllEditingState();
+
+  activeMode = null;
+
+  updateModeUI();
+  drawEditor();
+  updateHistoryButtons();
+
+  useAsSourceBtn.disabled = false;
+
+  setStatus(statusText);
+}
 
 brushMode.addEventListener("change", () => {
   brushState.mode = brushMode.value;
@@ -4455,6 +4679,19 @@ eraserMaskCtx.clearRect(
   eraserMaskCanvas.width,
   eraserMaskCanvas.height
 );
+
+/*
+  Слой Brush / Fill всегда должен иметь
+  тот же размер, что и Editor.
+*/
+paintCanvas.width = img.width;
+paintCanvas.height = img.height;
+paintCtx.clearRect(
+  0,
+  0,
+  paintCanvas.width,
+  paintCanvas.height
+);
    
   editCanvas.style.display = "block";
 
@@ -5957,7 +6194,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-Brush & Fill| v5.10.0
+Brush&Fill Fix| v5.10.1
   </div>
 
   <div class="row" id="build-down">
