@@ -505,6 +505,8 @@ button.active {
 .color-grid,
 .crop-grid,
 .lasso-grid,
+.fill-grid,
+.brush-grid,
 .pdf-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
@@ -676,6 +678,16 @@ The image is fitted into the page with selected margins and orientation.
     <div class="tool-wrap" data-tip-wrap>
       <button id="eraserModeBtn" type="button">Eraser</button>
       <div class="tool-tip">Erase pixels with a round or square brush.</div>
+    </div>
+
+    <div class="tool-wrap" data-tip-wrap>
+      <button id="fillModeBtn" type="button">Fill</button>
+      <div class="tool-tip">Fill LASSO, transparent pixels or the whole canvas.</div>
+    </div>
+
+    <div class="tool-wrap" data-tip-wrap>
+      <button id="brushModeBtn" type="button">Brush</button>
+      <div class="tool-tip">Paint with color or restore pixels removed by Eraser.</div>
     </div>
 
     <div class="tool-wrap" data-tip-wrap>
@@ -974,6 +986,71 @@ Softness smooths the transparent edge.
       </div>
     </div>
 
+
+<div id="fillPanel" class="mode-panel">
+  <div class="fill-grid">
+    <div class="field">
+      <label for="fillTarget">Target</label>
+      <select id="fillTarget">
+        <option value="lasso">LASSO selection</option>
+        <option value="transparent">Transparent area</option>
+        <option value="whole">Whole canvas</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="fillColor">Color</label>
+      <input id="fillColor" type="color" value="#ffffff">
+    </div>
+    <div class="field">
+      <label for="fillOpacity">Opacity: <span id="fillOpacityValue">100%</span></label>
+      <input id="fillOpacity" type="range" min="1" max="100" value="100">
+    </div>
+    <div class="field">
+      <label for="fillAlphaTolerance">Alpha tolerance: <span id="fillAlphaToleranceValue">8</span></label>
+      <input id="fillAlphaTolerance" type="range" min="0" max="255" value="8">
+    </div>
+    <div class="field">
+      <label>Action</label>
+      <button id="applyFillBtn" type="button">Fill now</button>
+    </div>
+  </div>
+</div>
+
+<div id="brushPanel" class="mode-panel">
+  <div class="brush-grid">
+    <div class="field">
+      <label for="brushMode">Brush mode</label>
+      <select id="brushMode">
+        <option value="color">Color</option>
+        <option value="restore">Restore after Eraser</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="brushColor">Color</label>
+      <input id="brushColor" type="color" value="#ffffff">
+    </div>
+    <div class="field">
+      <label for="brushSize">Size: <span id="brushSizeValue">40 px</span></label>
+      <input id="brushSize" type="range" min="1" max="200" value="40">
+    </div>
+    <div class="field">
+      <label for="brushOpacity">Opacity: <span id="brushOpacityValue">100%</span></label>
+      <input id="brushOpacity" type="range" min="1" max="100" value="100">
+    </div>
+    <div class="field">
+      <label for="brushShape">Shape</label>
+      <select id="brushShape">
+        <option value="round">Round</option>
+        <option value="square">Square</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Paint</label>
+      <button id="clearPaintBtn" type="button">Clear paint</button>
+    </div>
+  </div>
+</div>
+
 <div id="folderBrowser" class="mode-panel">
   <div id="folderList" class="note"></div>
   <div id="folderThumbs" class="gallery-grid"></div>
@@ -994,14 +1071,13 @@ Zoom: activate the button, click to set center, use wheel or pinch to zoom, drag
 Resize: set final Width and Height, with or without aspect ratio.
 Color: activate the button and adjust sliders.
 Key: select a color, tolerance and edge softness.
+Fill: fill LASSO, transparent pixels or the whole canvas.
+Brush: paint with color or restore pixels removed by Eraser.
 Apply: builds Result from the current Editor settings.
 Use as source: loads Result back into Editor.
 Avatar: creates a round avatar and also loads it back into the editor.
 Format: affects Save to disk.
     </div>
-
-<div id="editorHint" class="editor-hint"></div>
-     
   </div>
 
   <div class="row">
@@ -1013,7 +1089,7 @@ Format: affects Save to disk.
       <div class="info" id="originalInfo"></div>
     </div>
 
-
+<div id="editorHint" class="editor-hint"></div>
      
     <div class="panel">
   <h3>Result</h3>
@@ -1154,6 +1230,31 @@ const eraserMaskCanvas =
 
 const eraserMaskCtx =
   eraserMaskCanvas.getContext("2d");
+
+const paintCanvas = document.createElement("canvas");
+const paintCtx = paintCanvas.getContext("2d");
+
+const fillState = {
+  target: "lasso",
+  color: "#ffffff",
+  opacity: 100,
+  alphaTolerance: 8
+};
+
+const brushState = {
+  mode: "color",
+  color: "#ffffff",
+  size: 40,
+  opacity: 100,
+  shape: "round"
+};
+
+let isBrushing = false;
+let brushLastX = 0;
+let brushLastY = 0;
+let brushCursorX = 0;
+let brushCursorY = 0;
+
    
 /*
   СОСТОЯНИЕ RESIZE
@@ -1325,6 +1426,28 @@ const eraserOpacityValue =
 
 const eraserShape =
   document.getElementById("eraserShape");
+
+const fillModeBtn = document.getElementById("fillModeBtn");
+const fillPanel = document.getElementById("fillPanel");
+const fillTarget = document.getElementById("fillTarget");
+const fillColor = document.getElementById("fillColor");
+const fillOpacity = document.getElementById("fillOpacity");
+const fillOpacityValue = document.getElementById("fillOpacityValue");
+const fillAlphaTolerance = document.getElementById("fillAlphaTolerance");
+const fillAlphaToleranceValue = document.getElementById("fillAlphaToleranceValue");
+const applyFillBtn = document.getElementById("applyFillBtn");
+
+const brushModeBtn = document.getElementById("brushModeBtn");
+const brushPanel = document.getElementById("brushPanel");
+const brushMode = document.getElementById("brushMode");
+const brushColor = document.getElementById("brushColor");
+const brushSize = document.getElementById("brushSize");
+const brushSizeValue = document.getElementById("brushSizeValue");
+const brushOpacity = document.getElementById("brushOpacity");
+const brushOpacityValue = document.getElementById("brushOpacityValue");
+const brushShape = document.getElementById("brushShape");
+const clearPaintBtn = document.getElementById("clearPaintBtn");
+
    
 const editCanvas = document.getElementById("editCanvas");
 const editCtx = editCanvas.getContext("2d");
@@ -1805,7 +1928,9 @@ function finishFileInput() {
 
 cropModeBtn.addEventListener("click", () => toggleMode("crop"));
 lassoModeBtn.addEventListener("click", () => toggleMode("lasso"));
-eraserModeBtn.addEventListener("click", () => toggleMode("eraser"));   
+eraserModeBtn.addEventListener("click", () => toggleMode("eraser"));
+fillModeBtn.addEventListener("click", () => toggleMode("fill"));
+brushModeBtn.addEventListener("click", () => toggleMode("brush"));   
 zoomModeBtn.addEventListener("click", () => toggleMode("zoom"));
 resizeModeBtn.addEventListener("click", () => toggleMode("resize"));
 colorModeBtn.addEventListener("click", () => toggleMode("color"));
@@ -1836,13 +1961,27 @@ function updateModeUI() {
   colorModeBtn.classList.toggle("active", activeMode === "color");
   keyModeBtn.classList.toggle("active", activeMode === "key");
   eraserModeBtn.classList.toggle("active", activeMode === "eraser");
+  fillModeBtn.classList.toggle("active", activeMode === "fill");
+  brushModeBtn.classList.toggle("active", activeMode === "brush");
    
   eraserPanel.classList.toggle("visible", activeMode === "eraser");
+  fillPanel.classList.toggle("visible", activeMode === "fill");
+  brushPanel.classList.toggle("visible", activeMode === "brush");
   cropPanel.classList.toggle("visible", activeMode === "crop");
   lassoPanel.classList.toggle("visible", activeMode === "lasso");
   resizePanel.classList.toggle("visible", activeMode === "resize");
   colorPanel.classList.toggle("visible", activeMode === "color");
   keyPanel.classList.toggle("visible", activeMode === "key");
+  if (activeMode === "fill") {
+    editorHint.textContent = "FILL: choose target and press Fill now.";
+    return;
+  }
+
+  if (activeMode === "brush") {
+    editorHint.textContent = "BRUSH: Color paints; Restore brings back pixels removed by Eraser.";
+    return;
+  }
+
 
 if (activeMode === "crop") {
   editCanvas.style.cursor = "crosshair";
@@ -1850,8 +1989,11 @@ if (activeMode === "crop") {
 } else if (activeMode === "lasso") {
   editCanvas.style.cursor = "crosshair";
 
-} else if (activeMode === "eraser") {
+} else if (activeMode === "eraser" || activeMode === "brush") {
   editCanvas.style.cursor = "none";
+
+} else if (activeMode === "fill") {
+  editCanvas.style.cursor = "cell";
 
 } else if (activeMode === "zoom") {
   editCanvas.style.cursor =
@@ -2589,12 +2731,220 @@ function clearEraserMask() {
     eraserMaskCanvas.height
   );
 
+paintCanvas.width = img.width;
+paintCanvas.height = img.height;
+paintCtx.clearRect(0, 0, img.width, img.height);
+
   isErasing =
     false;
 
   drawEditor();
 }
    
+
+/*
+================================
+FILL И BRUSH
+================================
+*/
+
+fillTarget.addEventListener("change", () => {
+  fillState.target = fillTarget.value;
+});
+
+fillColor.addEventListener("input", () => {
+  fillState.color = fillColor.value;
+});
+
+fillOpacity.addEventListener("input", () => {
+  fillState.opacity = Number(fillOpacity.value) || 100;
+  fillOpacityValue.textContent = fillState.opacity + "%";
+});
+
+fillAlphaTolerance.addEventListener("input", () => {
+  fillState.alphaTolerance = Number(fillAlphaTolerance.value) || 0;
+  fillAlphaToleranceValue.textContent = String(fillState.alphaTolerance);
+});
+
+applyFillBtn.addEventListener("click", () => {
+  if (!sourceImage) return;
+
+  const color = hexToRgba(fillState.color, fillState.opacity / 100);
+
+  if (fillState.target === "lasso") {
+    if (!lassoClosed || lassoPoints.length < 3) {
+      setStatus("Close LASSO first");
+      return;
+    }
+
+    paintCtx.save();
+    traceLassoPath(paintCtx, lassoPoints, true);
+    paintCtx.clip();
+    paintCtx.fillStyle = color;
+    paintCtx.fillRect(0, 0, paintCanvas.width, paintCanvas.height);
+    paintCtx.restore();
+  } else if (fillState.target === "whole") {
+    paintCtx.fillStyle = color;
+    paintCtx.fillRect(0, 0, paintCanvas.width, paintCanvas.height);
+  } else {
+    const temp = document.createElement("canvas");
+    temp.width = editCanvas.width;
+    temp.height = editCanvas.height;
+    const tempCtx = temp.getContext("2d");
+
+    tempCtx.drawImage(sourceImage, 0, 0, imageNaturalWidth, imageNaturalHeight, 0, 0, temp.width, temp.height);
+    tempCtx.save();
+    tempCtx.globalCompositeOperation = "destination-out";
+    tempCtx.drawImage(eraserMaskCanvas, 0, 0);
+    tempCtx.restore();
+
+    const srcData = tempCtx.getImageData(0, 0, temp.width, temp.height);
+    const fillData = paintCtx.createImageData(temp.width, temp.height);
+    const rgb = hexToRgb(fillState.color);
+    const alpha = Math.round(255 * fillState.opacity / 100);
+
+    for (let i = 0; i < srcData.data.length; i += 4) {
+      if (srcData.data[i + 3] <= fillState.alphaTolerance) {
+        fillData.data[i] = rgb.r;
+        fillData.data[i + 1] = rgb.g;
+        fillData.data[i + 2] = rgb.b;
+        fillData.data[i + 3] = alpha;
+      }
+    }
+
+    paintCtx.putImageData(fillData, 0, 0);
+  }
+
+  drawEditor();
+  setStatus("Fill OK");
+});
+
+brushMode.addEventListener("change", () => {
+  brushState.mode = brushMode.value;
+});
+
+brushColor.addEventListener("input", () => {
+  brushState.color = brushColor.value;
+});
+
+brushSize.addEventListener("input", () => {
+  brushState.size = Number(brushSize.value) || 1;
+  brushSizeValue.textContent = brushState.size + " px";
+  drawEditor();
+});
+
+brushOpacity.addEventListener("input", () => {
+  brushState.opacity = Number(brushOpacity.value) || 100;
+  brushOpacityValue.textContent = brushState.opacity + "%";
+});
+
+brushShape.addEventListener("change", () => {
+  brushState.shape = brushShape.value;
+  drawEditor();
+});
+
+clearPaintBtn.addEventListener("click", () => {
+  paintCtx.clearRect(0, 0, paintCanvas.width, paintCanvas.height);
+  drawEditor();
+});
+
+function drawBrushStroke(fromX, fromY, toX, toY) {
+  const targetCtx = brushState.mode === "restore" ? eraserMaskCtx : paintCtx;
+  const operation = brushState.mode === "restore" ? "destination-out" : "source-over";
+  const dx = toX - fromX;
+  const dy = toY - fromY;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  const step = Math.max(1, brushState.size * 0.15);
+  const count = Math.max(1, Math.ceil(distance / step));
+
+  targetCtx.save();
+  targetCtx.globalCompositeOperation = operation;
+  targetCtx.globalAlpha = brushState.opacity / 100;
+  targetCtx.fillStyle = brushState.color;
+
+  for (let i = 0; i <= count; i++) {
+    const ratio = i / count;
+    const x = fromX + dx * ratio;
+    const y = fromY + dy * ratio;
+
+    if (brushState.shape === "square") {
+      targetCtx.fillRect(x - brushState.size / 2, y - brushState.size / 2, brushState.size, brushState.size);
+    } else {
+      targetCtx.beginPath();
+      targetCtx.arc(x, y, brushState.size / 2, 0, Math.PI * 2);
+      targetCtx.fill();
+    }
+  }
+
+  targetCtx.restore();
+  drawEditor();
+}
+
+function drawBrushCursor() {
+  editCtx.save();
+  editCtx.lineWidth = 1.5;
+  editCtx.strokeStyle = brushState.mode === "restore" ? "#22c55e" : "#ffffff";
+
+  if (brushState.shape === "square") {
+    editCtx.strokeRect(brushCursorX - brushState.size / 2, brushCursorY - brushState.size / 2, brushState.size, brushState.size);
+  } else {
+    editCtx.beginPath();
+    editCtx.arc(brushCursorX, brushCursorY, brushState.size / 2, 0, Math.PI * 2);
+    editCtx.stroke();
+  }
+
+  editCtx.restore();
+}
+
+editCanvas.addEventListener("mousedown", (event) => {
+  if (!sourceImage || activeMode !== "brush") return;
+
+  event.preventDefault();
+  const pos = getMousePosOnCanvas(event);
+  isBrushing = true;
+  brushLastX = pos.x;
+  brushLastY = pos.y;
+  brushCursorX = pos.x;
+  brushCursorY = pos.y;
+  drawBrushStroke(pos.x, pos.y, pos.x, pos.y);
+});
+
+editCanvas.addEventListener("mousemove", (event) => {
+  if (!sourceImage || activeMode !== "brush") return;
+
+  const pos = getMousePosOnCanvas(event);
+  brushCursorX = pos.x;
+  brushCursorY = pos.y;
+
+  if (!isBrushing) {
+    drawEditor();
+    return;
+  }
+
+  drawBrushStroke(brushLastX, brushLastY, pos.x, pos.y);
+  brushLastX = pos.x;
+  brushLastY = pos.y;
+});
+
+window.addEventListener("mouseup", () => {
+  isBrushing = false;
+});
+
+function hexToRgb(hex) {
+  const value = String(hex).replace("#", "");
+  return {
+    r: parseInt(value.slice(0, 2), 16) || 0,
+    g: parseInt(value.slice(2, 4), 16) || 0,
+    b: parseInt(value.slice(4, 6), 16) || 0
+  };
+}
+
+function hexToRgba(hex, alpha) {
+  const rgb = hexToRgb(hex);
+  return `rgba(${rgb.r},${rgb.g},${rgb.b},${alpha})`;
+}
+
+
 /*
 ================================
 УПРАВЛЕНИЕ LASSO
@@ -4227,16 +4577,20 @@ function drawEditor() {
   } else {
     drawNormalEditor();
   }
+  editCtx.save();
+  editCtx.globalCompositeOperation = "destination-out";
+  editCtx.drawImage(eraserMaskCanvas, 0, 0, editCanvas.width, editCanvas.height);
+  editCtx.restore();
 
-  applyEraserMaskToContext(
-    editCtx,
-    editCanvas.width,
-    editCanvas.height
-  );
+  editCtx.drawImage(paintCanvas, 0, 0, editCanvas.width, editCanvas.height);
 
-if (activeMode === "eraser") {
+  if (activeMode === "eraser") {
     drawEraserCursor();
-}
+  }
+
+  if (activeMode === "brush") {
+    drawBrushCursor();
+  }
 }
 
 function drawNormalEditor() {
@@ -4620,11 +4974,12 @@ async function buildFinalFile(file, options = {}) {
   Маску Eraser переносим в итоговый canvas.
   Она автоматически масштабируется под Result.
 */
-applyEraserMaskToContext(
-  outCtx,
-  finalWidth,
-  finalHeight
-);
+outCtx.save();
+outCtx.globalCompositeOperation = "destination-out";
+outCtx.drawImage(eraserMaskCanvas, 0, 0, eraserMaskCanvas.width, eraserMaskCanvas.height, 0, 0, finalWidth, finalHeight);
+outCtx.restore();
+
+outCtx.drawImage(paintCanvas, 0, 0, paintCanvas.width, paintCanvas.height, 0, 0, finalWidth, finalHeight);
    
   if (keyState && keyState.enabled) {
     applyColorKey(outCtx, finalWidth, finalHeight, keyState);
@@ -5602,7 +5957,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-fix editorHint | v5.9.5
+Brush & Fill| v5.10.0
   </div>
 
   <div class="row" id="build-down">
