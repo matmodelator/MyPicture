@@ -2999,14 +2999,20 @@ applyFillBtn.addEventListener("click", async () => {
       paintCtx.restore();
     }
 
-    drawEditor();
+   /*
+  Fill меняет только рабочий слой Editor.
 
-    /*
-      Fill сразу фиксируется как полноценный шаг истории.
-    */
-    await commitCurrentEditorToHistory(
-      "Fill OK"
-    );
+  Result здесь НЕ создаётся.
+  История Undo / Redo здесь НЕ меняется.
+
+  Результат и новый шаг истории появятся
+  только после нажатия Apply.
+*/
+drawEditor();
+
+setStatus(
+  "Fill ready. Press Apply."
+);
 
   } catch (error) {
     setStatus(
@@ -3045,8 +3051,18 @@ async function commitCurrentEditorToHistory(statusText) {
 
   await showResult(processedFile);
 
-  sourceFile = processedFile;
-  pushHistory(sourceFile);
+  /*
+  Сначала явно записываем новый Result
+  как отдельный шаг истории.
+*/
+pushHistory(processedFile);
+
+/*
+  После записи истории Result становится
+  текущим файлом Editor.
+*/
+sourceFile =
+  processedFile;
 
   await loadSourceFileIntoEditor(
     sourceFile
@@ -6324,7 +6340,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-Clone Stamp| v5.10.2
+fix undo\redo & apply\result | v5.10.3
   </div>
 
   <div class="row" id="build-down">
