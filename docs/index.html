@@ -710,12 +710,7 @@ The image is fitted into the page with selected margins and orientation.
       <div class="tool-tip">Remove a selected color with tolerance and edge softness.</div>
     </div>
 
-    <div class="tool-wrap" data-tip-wrap>
-      <button id="backToOriginalBtn" type="button" disabled>Back to original</button>
-      <div class="tool-tip">Return to the first uploaded image.</div>
-    </div>
-
-  </div>
+     </div>
 
        <div class="center-tools">
         <div class="tool-wrap" data-tip-wrap>
@@ -735,6 +730,11 @@ The image is fitted into the page with selected margins and orientation.
           <div class="tool-tip">Build Result from current Editor settings.</div>
         </div>
 
+        <div class="tool-wrap" data-tip-wrap>
+        <button id="backToOriginalBtn" type="button" disabled>Back to original</button>
+        <div class="tool-tip">Return to the first uploaded image.</div>
+        </div>
+         
         <div class="tool-wrap" data-tip-wrap>
           <button id="useAsSourceBtn" type="button" disabled>Use as source</button>
           <div class="tool-tip">Load Result back into Editor as the new source image.</div>
@@ -6340,7 +6340,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-fix undo\redo & apply\result | v5.10.3
+fix  backToOriginalBtn | v5.10.4
   </div>
 
   <div class="row" id="build-down">
