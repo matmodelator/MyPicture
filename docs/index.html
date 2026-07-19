@@ -1023,6 +1023,7 @@ Softness smooths the transparent edge.
       <select id="brushMode">
         <option value="color">Color</option>
         <option value="restore">Restore after Eraser</option>
+        <option value="clone">Clone Stamp / Замазка</option>
       </select>
     </div>
     <div class="field">
@@ -1043,6 +1044,11 @@ Softness smooths the transparent edge.
         <option value="round">Round</option>
         <option value="square">Square</option>
       </select>
+    </div>
+    <div class="field" id="cloneSourceField">
+      <label>Clone source</label>
+      <button id="setCloneSourceBtn" type="button">Set source</button>
+      <div class="slider-value" id="cloneSourceValue">Not selected</div>
     </div>
     <div class="field">
       <label>Paint</label>
@@ -1072,7 +1078,7 @@ Resize: set final Width and Height, with or without aspect ratio.
 Color: activate the button and adjust sliders.
 Key: select a color, tolerance and edge softness.
 Fill: fill LASSO, transparent pixels or the whole canvas.
-Brush: paint with color or restore pixels removed by Eraser.
+Brush: Color paints; Restore restores Eraser; Clone Stamp copies texture from a selected source.
 Apply: builds Result from the current Editor settings.
 Use as source: loads Result back into Editor.
 Avatar: creates a round avatar and also loads it back into the editor.
@@ -1249,6 +1255,16 @@ const brushState = {
   opacity: 100,
   shape: "round"
 };
+
+/* Clone Stamp: источник фактуры и снимок на начало мазка */
+let cloneSourceX = null;
+let cloneSourceY = null;
+let clonePickingSource = false;
+let cloneOffsetX = 0;
+let cloneOffsetY = 0;
+
+const cloneSampleCanvas = document.createElement("canvas");
+const cloneSampleCtx = cloneSampleCanvas.getContext("2d");
 
 let isBrushing = false;
 let brushLastX = 0;
@@ -1448,6 +1464,9 @@ const brushOpacity = document.getElementById("brushOpacity");
 const brushOpacityValue = document.getElementById("brushOpacityValue");
 const brushShape = document.getElementById("brushShape");
 const clearPaintBtn = document.getElementById("clearPaintBtn");
+const cloneSourceField = document.getElementById("cloneSourceField");
+const setCloneSourceBtn = document.getElementById("setCloneSourceBtn");
+const cloneSourceValue = document.getElementById("cloneSourceValue");
 
    
 const editCanvas = document.getElementById("editCanvas");
@@ -1979,7 +1998,10 @@ function updateModeUI() {
   }
 
   if (activeMode === "brush") {
-    editorHint.textContent = "BRUSH: Color paints; Restore brings back pixels removed by Eraser.";
+    editorHint.textContent =
+      brushState.mode === "clone"
+        ? "CLONE STAMP: Set source, click texture, then drag elsewhere to copy it along the trace."
+        : "BRUSH: Color paints; Restore brings back pixels removed by Eraser.";
     return;
   }
 
@@ -3045,7 +3067,18 @@ async function commitCurrentEditorToHistory(statusText) {
 
 brushMode.addEventListener("change", () => {
   brushState.mode = brushMode.value;
+  cloneSourceField.style.display =
+    brushState.mode === "clone" ? "flex" : "none";
+  drawEditor();
 });
+
+setCloneSourceBtn.addEventListener("click", () => {
+  clonePickingSource = true;
+  setCloneSourceBtn.classList.add("active");
+  setStatus("Clone Stamp: click the source texture on Editor");
+});
+
+cloneSourceField.style.display = "none";
 
 brushColor.addEventListener("input", () => {
   brushState.color = brushColor.value;
@@ -3072,14 +3105,83 @@ clearPaintBtn.addEventListener("click", () => {
   drawEditor();
 });
 
+function captureCloneSample() {
+  cloneSampleCanvas.width = editCanvas.width;
+  cloneSampleCanvas.height = editCanvas.height;
+
+  /*
+    Снимаем Editor без служебного курсора Brush.
+    Это фиксированный источник на весь текущий мазок.
+  */
+  const previousMode = activeMode;
+  activeMode = null;
+  drawEditor();
+
+  cloneSampleCtx.clearRect(
+    0,
+    0,
+    cloneSampleCanvas.width,
+    cloneSampleCanvas.height
+  );
+
+  cloneSampleCtx.drawImage(editCanvas, 0, 0);
+
+  activeMode = previousMode;
+  drawEditor();
+}
+
+function drawCloneStampAt(destinationX, destinationY) {
+  const size = Math.max(1, brushState.size);
+  const half = size / 2;
+  const sourceX = destinationX + cloneOffsetX;
+  const sourceY = destinationY + cloneOffsetY;
+
+  paintCtx.save();
+  paintCtx.globalCompositeOperation = "source-over";
+  paintCtx.globalAlpha = brushState.opacity / 100;
+
+  if (brushState.shape === "round") {
+    paintCtx.beginPath();
+    paintCtx.arc(destinationX, destinationY, half, 0, Math.PI * 2);
+    paintCtx.clip();
+  }
+
+  paintCtx.drawImage(
+    cloneSampleCanvas,
+    sourceX - half,
+    sourceY - half,
+    size,
+    size,
+    destinationX - half,
+    destinationY - half,
+    size,
+    size
+  );
+
+  paintCtx.restore();
+}
+
 function drawBrushStroke(fromX, fromY, toX, toY) {
-  const targetCtx = brushState.mode === "restore" ? eraserMaskCtx : paintCtx;
-  const operation = brushState.mode === "restore" ? "destination-out" : "source-over";
   const dx = toX - fromX;
   const dy = toY - fromY;
   const distance = Math.sqrt(dx * dx + dy * dy);
   const step = Math.max(1, brushState.size * 0.15);
   const count = Math.max(1, Math.ceil(distance / step));
+
+  if (brushState.mode === "clone") {
+    for (let i = 0; i <= count; i++) {
+      const ratio = i / count;
+      const x = fromX + dx * ratio;
+      const y = fromY + dy * ratio;
+      drawCloneStampAt(x, y);
+    }
+
+    drawEditor();
+    return;
+  }
+
+  const targetCtx = brushState.mode === "restore" ? eraserMaskCtx : paintCtx;
+  const operation = brushState.mode === "restore" ? "destination-out" : "source-over";
 
   targetCtx.save();
   targetCtx.globalCompositeOperation = operation;
@@ -3107,7 +3209,10 @@ function drawBrushStroke(fromX, fromY, toX, toY) {
 function drawBrushCursor() {
   editCtx.save();
   editCtx.lineWidth = 1.5;
-  editCtx.strokeStyle = brushState.mode === "restore" ? "#22c55e" : "#ffffff";
+  editCtx.strokeStyle =
+    brushState.mode === "restore"
+      ? "#22c55e"
+      : (brushState.mode === "clone" ? "#f59e0b" : "#ffffff");
 
   if (brushState.shape === "square") {
     editCtx.strokeRect(brushCursorX - brushState.size / 2, brushCursorY - brushState.size / 2, brushState.size, brushState.size);
@@ -3125,11 +3230,36 @@ editCanvas.addEventListener("mousedown", (event) => {
 
   event.preventDefault();
   const pos = getMousePosOnCanvas(event);
+
+  brushCursorX = pos.x;
+  brushCursorY = pos.y;
+
+  if (brushState.mode === "clone") {
+    if (clonePickingSource || event.altKey) {
+      cloneSourceX = pos.x;
+      cloneSourceY = pos.y;
+      clonePickingSource = false;
+      setCloneSourceBtn.classList.remove("active");
+      cloneSourceValue.textContent =
+        "Source: " + Math.round(pos.x) + ", " + Math.round(pos.y);
+      drawEditor();
+      setStatus("Clone source selected OK");
+      return;
+    }
+
+    if (cloneSourceX === null || cloneSourceY === null) {
+      setStatus("Press Set source, then click the source texture");
+      return;
+    }
+
+    captureCloneSample();
+    cloneOffsetX = cloneSourceX - pos.x;
+    cloneOffsetY = cloneSourceY - pos.y;
+  }
+
   isBrushing = true;
   brushLastX = pos.x;
   brushLastY = pos.y;
-  brushCursorX = pos.x;
-  brushCursorY = pos.y;
   drawBrushStroke(pos.x, pos.y, pos.x, pos.y);
 });
 
@@ -6194,7 +6324,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-Brush&Fill Fix| v5.10.1
+Clone Stamp| v5.10.2
   </div>
 
   <div class="row" id="build-down">
