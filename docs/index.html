@@ -712,17 +712,6 @@ The image is fitted into the page with selected margins and orientation.
 
      </div>
 
-       <div class="center-tools">
-        <div class="tool-wrap" data-tip-wrap>
-          <button id="undoBtn" type="button" disabled>Undo</button>
-          <div class="tool-tip">Undo one editing step.</div>
-        </div>
-        <div class="tool-wrap" data-tip-wrap>
-  <button id="redoBtn" type="button" disabled>Redo</button>
-  <div class="tool-tip">Redo one Apply step.</div>
-</div> 
-      </div>
-
       <div class="right-tools">
 
         <div class="tool-wrap" data-tip-wrap>
@@ -1089,14 +1078,39 @@ Format: affects Save to disk.
      
   </div>
 
-  <div class="row">
-    <div class="panel">
+ <div class="row">
+
+  <div class="panel">
+
+    <div class="panel-header">
+
       <h3>Editor</h3>
-      <div class="preview-box">
-        <canvas id="editCanvas"></canvas>
+
+      <div class="editor-history">
+
+        <button id="undoBtn"
+                type="button"
+                disabled>
+          Undo
+        </button>
+
+        <button id="redoBtn"
+                type="button"
+                disabled>
+          Redo
+        </button>
+
       </div>
-      <div class="info" id="originalInfo"></div>
+
     </div>
+
+    <div class="preview-box">
+      <canvas id="editCanvas"></canvas>
+    </div>
+
+    <div class="info" id="originalInfo"></div>
+
+  </div>
     
     <div class="panel">
   <h3>Result</h3>
@@ -6340,7 +6354,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-fix  backToOriginalBtn | v5.10.4
+fix  Undo\Redo Btn | v5.10.5
   </div>
 
   <div class="row" id="build-down">
