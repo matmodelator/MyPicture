@@ -743,16 +743,6 @@ The image is fitted into the page with selected margins and orientation.
         </div>
 
         <div class="tool-wrap" data-tip-wrap>
-        <button id="backToOriginalBtn" type="button" disabled>Back to original</button>
-        <div class="tool-tip">Return to the first uploaded image.</div>
-        </div>
-         
-        <div class="tool-wrap" data-tip-wrap>
-          <button id="useAsSourceBtn" type="button" disabled>Use as source</button>
-          <div class="tool-tip">Load Result back into Editor as the new source image.</div>
-        </div>
-
-        <div class="tool-wrap" data-tip-wrap>
           <button id="makeAvatarBtn" type="button" class="avatar-btn">Avatar</button>
           <div class="tool-tip">Create a round avatar from the current image.</div>
         </div>
@@ -1135,10 +1125,31 @@ Format: affects Save to disk.
 
   </div>
     
-    <div class="panel">
-  <h3>Result</h3>
+   <div class="panel">
 
-       <div class="preview-box">
+  <div class="panel-header">
+
+    <h3>Result</h3>
+
+    <div class="editor-history">
+
+      <button id="backToOriginalBtn"
+              type="button"
+              disabled>
+        Back to original
+      </button>
+
+      <button id="useAsSourceBtn"
+              type="button"
+              disabled>
+        Use as source
+      </button>
+
+    </div>
+
+  </div>
+
+  <div class="preview-box">
      
         <div id="resultPlaceholder" class="note">Press Apply to make Result</div>
         <img id="resultPreview" alt="Result">
