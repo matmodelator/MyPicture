@@ -361,6 +361,29 @@ button.active {
   padding: 16px;
 }
 
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 8px;
+}
+
+.panel-header h3 {
+  margin: 0;
+}
+
+.editor-history {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.editor-history button {
+  padding: 8px 12px;
+}
+   
 .preview-box {
   min-height: 420px;
 
@@ -1084,7 +1107,7 @@ Format: affects Save to disk.
 
     <div class="panel-header">
 
-      <h3>Editor</h3>
+      <h3 class="panel-title">Editor</h3>
 
       <div class="editor-history">
 
@@ -6354,7 +6377,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-fix  Undo\Redo Btn | v5.10.5
+fix  panel-header | v5.10.6
   </div>
 
   <div class="row" id="build-down">
