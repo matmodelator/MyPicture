@@ -530,6 +530,7 @@ button.active {
 .lasso-grid,
 .fill-grid,
 .brush-grid,
+.move-grid,
 .pdf-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
@@ -699,6 +700,11 @@ The image is fitted into the page with selected margins and orientation.
     </div>
 
     <div class="tool-wrap" data-tip-wrap>
+      <button id="moveModeBtn" type="button">Move</button>
+      <div class="tool-tip">Copy or cut a closed LASSO selection, then move, rotate, scale, flip, flop or delete it.</div>
+    </div>
+
+    <div class="tool-wrap" data-tip-wrap>
       <button id="eraserModeBtn" type="button">Eraser</button>
       <div class="tool-tip">Erase pixels with a round or square brush.</div>
     </div>
@@ -836,6 +842,50 @@ Outside the closed contour becomes transparent after Apply.
     </div>
 
      
+
+    <!-- Панель MOVE SELECTION -->
+    <div id="movePanel" class="mode-panel">
+      <div class="move-grid">
+
+        <div class="field">
+          <label for="moveSelectionMode">Mode</label>
+          <select id="moveSelectionMode">
+            <option value="copy">Copy</option>
+            <option value="cut">Cut</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Selection</label>
+          <button id="prepareSelectionBtn" type="button">Take from LASSO</button>
+        </div>
+
+        <div class="field">
+          <label for="moveScale">Scale: <span id="moveScaleValue">100%</span></label>
+          <input id="moveScale" type="range" min="10" max="300" step="1" value="100">
+        </div>
+
+        <div class="field">
+          <label for="moveRotation">Rotate: <span id="moveRotationValue">0°</span></label>
+          <input id="moveRotation" type="range" min="-180" max="180" step="1" value="0">
+        </div>
+
+        <div class="field">
+          <label>Transform</label>
+          <div>
+            <button id="flipSelectionBtn" type="button">Flip</button>
+            <button id="flopSelectionBtn" type="button">Flop</button>
+            <button id="deleteSelectionBtn" type="button">Delete</button>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="note">
+Close LASSO first, choose Copy or Cut, press Take from LASSO, then drag the selection.
+Flip mirrors horizontally. Flop mirrors vertically. Apply commits the transformed selection to Result.
+      </div>
+    </div>
 
     <!-- Панель Resize видна только при активном режиме Resize -->
     <div id="resizePanel" class="mode-panel">
@@ -1188,7 +1238,7 @@ let sourceImage = null;
 let imageNaturalWidth = 0;
 let imageNaturalHeight = 0;
 
-/* Активный режим: null | crop | lasso | zoom | resize | color | key */
+/* Активный режим: null | crop | lasso | move | eraser | fill | brush | zoom | resize | color | key */
 let activeMode = null;
 
 /*
@@ -1254,6 +1304,39 @@ let lassoInverted = false;
 
 /* Отмена ложного клика */   
 let suppressLassoClick = false;   
+
+/*
+================================
+СОСТОЯНИЕ MOVE SELECTION
+================================
+*/
+
+const selectionCanvas = document.createElement("canvas");
+const selectionCtx = selectionCanvas.getContext("2d");
+
+const selectionBaseCanvas = document.createElement("canvas");
+const selectionBaseCtx = selectionBaseCanvas.getContext("2d");
+
+const moveSelectionState = {
+  mode: "copy",
+  ready: false,
+  deleted: false,
+  centerX: 0,
+  centerY: 0,
+  width: 0,
+  height: 0,
+  scale: 1,
+  rotation: 0,
+  flipX: 1,
+  flipY: 1
+};
+
+let isMovingSelection = false;
+let moveSelectionStartX = 0;
+let moveSelectionStartY = 0;
+let moveSelectionOriginX = 0;
+let moveSelectionOriginY = 0;
+
 
 /*
 ================================
@@ -1409,6 +1492,7 @@ const pdfMargin = document.getElementById("pdfMargin");
 
 const cropModeBtn = document.getElementById("cropModeBtn");
 const lassoModeBtn = document.getElementById("lassoModeBtn");
+const moveModeBtn = document.getElementById("moveModeBtn");
 const zoomModeBtn = document.getElementById("zoomModeBtn");
 const resizeModeBtn = document.getElementById("resizeModeBtn");
 const colorModeBtn = document.getElementById("colorModeBtn");
@@ -1435,6 +1519,7 @@ const zipBtn =
    
 const cropPanel = document.getElementById("cropPanel");
 const lassoPanel = document.getElementById("lassoPanel");
+const movePanel = document.getElementById("movePanel");
 const resizePanel = document.getElementById("resizePanel");
 const colorPanel = document.getElementById("colorPanel");
 const keyPanel = document.getElementById("keyPanel");
@@ -1448,6 +1533,16 @@ const magneticRadius = document.getElementById("magneticRadius");
 const magneticRadiusValue = document.getElementById("magneticRadiusValue");
 const closeLassoBtn = document.getElementById("closeLassoBtn");
 const clearLassoBtn = document.getElementById("clearLassoBtn");
+
+const moveSelectionMode = document.getElementById("moveSelectionMode");
+const prepareSelectionBtn = document.getElementById("prepareSelectionBtn");
+const moveScale = document.getElementById("moveScale");
+const moveScaleValue = document.getElementById("moveScaleValue");
+const moveRotation = document.getElementById("moveRotation");
+const moveRotationValue = document.getElementById("moveRotationValue");
+const flipSelectionBtn = document.getElementById("flipSelectionBtn");
+const flopSelectionBtn = document.getElementById("flopSelectionBtn");
+const deleteSelectionBtn = document.getElementById("deleteSelectionBtn");
 
 const brightnessRange = document.getElementById("brightnessRange");
 const saturationRange = document.getElementById("saturationRange");
@@ -1996,6 +2091,7 @@ function finishFileInput() {
 
 cropModeBtn.addEventListener("click", () => toggleMode("crop"));
 lassoModeBtn.addEventListener("click", () => toggleMode("lasso"));
+moveModeBtn.addEventListener("click", () => toggleMode("move"));
 eraserModeBtn.addEventListener("click", () => toggleMode("eraser"));
 fillModeBtn.addEventListener("click", () => toggleMode("fill"));
 brushModeBtn.addEventListener("click", () => toggleMode("brush"));   
@@ -2024,6 +2120,7 @@ function toggleMode(mode) {
 function updateModeUI() {
   cropModeBtn.classList.toggle("active", activeMode === "crop");
   lassoModeBtn.classList.toggle("active", activeMode === "lasso");
+  moveModeBtn.classList.toggle("active", activeMode === "move");
   zoomModeBtn.classList.toggle("active", activeMode === "zoom");
   resizeModeBtn.classList.toggle("active", activeMode === "resize");
   colorModeBtn.classList.toggle("active", activeMode === "color");
@@ -2037,6 +2134,7 @@ function updateModeUI() {
   brushPanel.classList.toggle("visible", activeMode === "brush");
   cropPanel.classList.toggle("visible", activeMode === "crop");
   lassoPanel.classList.toggle("visible", activeMode === "lasso");
+  movePanel.classList.toggle("visible", activeMode === "move");
   resizePanel.classList.toggle("visible", activeMode === "resize");
   colorPanel.classList.toggle("visible", activeMode === "color");
   keyPanel.classList.toggle("visible", activeMode === "key");
@@ -2059,6 +2157,11 @@ if (activeMode === "crop") {
 
 } else if (activeMode === "lasso") {
   editCanvas.style.cursor = "crosshair";
+
+} else if (activeMode === "move") {
+  editCanvas.style.cursor = moveSelectionState.ready
+    ? (isMovingSelection ? "grabbing" : "grab")
+    : "default";
 
 } else if (activeMode === "eraser" || activeMode === "brush") {
   editCanvas.style.cursor = "none";
@@ -2096,6 +2199,12 @@ function updateEditorHint() {
   if (activeMode === "lasso") {
     editorHint.textContent =
       "LASSO: Backspace — Undo point | \\ — Redo point | Enter — Close | Esc — Clear | Delete — Delete point";
+    return;
+  }
+
+  if (activeMode === "move") {
+    editorHint.textContent =
+      "MOVE: Close LASSO, choose Copy or Cut, press Take from LASSO, then drag. Flip = horizontal, Flop = vertical.";
     return;
   }
 
@@ -2139,6 +2248,483 @@ function updateEditorHint() {
     "Select an editing tool.";
 }
    
+
+/*
+================================
+MOVE SELECTION
+================================
+*/
+
+moveSelectionMode.addEventListener("change", () => {
+  moveSelectionState.mode = moveSelectionMode.value;
+});
+
+moveScale.addEventListener("input", () => {
+  moveSelectionState.scale =
+    Math.max(0.1, Number(moveScale.value) / 100);
+
+  moveScaleValue.textContent =
+    Math.round(moveSelectionState.scale * 100) + "%";
+
+  if (moveSelectionState.ready) {
+    drawEditor();
+  }
+});
+
+moveRotation.addEventListener("input", () => {
+  moveSelectionState.rotation =
+    Number(moveRotation.value) || 0;
+
+  moveRotationValue.textContent =
+    moveSelectionState.rotation + "°";
+
+  if (moveSelectionState.ready) {
+    drawEditor();
+  }
+});
+
+flipSelectionBtn.addEventListener("click", () => {
+  if (!moveSelectionState.ready)
+    return;
+
+  moveSelectionState.flipX *= -1;
+  drawEditor();
+});
+
+flopSelectionBtn.addEventListener("click", () => {
+  if (!moveSelectionState.ready)
+    return;
+
+  moveSelectionState.flipY *= -1;
+  drawEditor();
+});
+
+deleteSelectionBtn.addEventListener("click", () => {
+  if (!moveSelectionState.ready)
+    return;
+
+  moveSelectionState.deleted = true;
+  drawEditor();
+  setStatus("Selection deleted");
+});
+
+prepareSelectionBtn.addEventListener("click", prepareMoveSelection);
+
+function getLassoBounds(points) {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  points.forEach((point) => {
+    minX = Math.min(minX, point.x);
+    minY = Math.min(minY, point.y);
+    maxX = Math.max(maxX, point.x);
+    maxY = Math.max(maxY, point.y);
+  });
+
+  return {
+    x: Math.max(0, Math.floor(minX)),
+    y: Math.max(0, Math.floor(minY)),
+    width: Math.max(1, Math.ceil(maxX - minX)),
+    height: Math.max(1, Math.ceil(maxY - minY))
+  };
+}
+
+function buildCurrentEditorSnapshot() {
+  const snapshot =
+    document.createElement("canvas");
+
+  snapshot.width =
+    editCanvas.width;
+
+  snapshot.height =
+    editCanvas.height;
+
+  const ctx =
+    snapshot.getContext("2d");
+
+  ctx.clearRect(
+    0,
+    0,
+    snapshot.width,
+    snapshot.height
+  );
+
+  ctx.filter =
+    buildCanvasFilterString(colorState);
+
+  ctx.drawImage(
+    sourceImage,
+    0,
+    0,
+    imageNaturalWidth,
+    imageNaturalHeight,
+    0,
+    0,
+    snapshot.width,
+    snapshot.height
+  );
+
+  ctx.filter = "none";
+
+  if (colorState.temperature !== 0) {
+    applyTemperatureOverlay(
+      ctx,
+      snapshot.width,
+      snapshot.height,
+      colorState.temperature
+    );
+  }
+
+  if (keyState.enabled) {
+    applyColorKey(
+      ctx,
+      snapshot.width,
+      snapshot.height,
+      keyState
+    );
+  }
+
+  applyEraserMaskToContext(
+    ctx,
+    snapshot.width,
+    snapshot.height
+  );
+
+  if (paintCanvas.width && paintCanvas.height) {
+    ctx.drawImage(
+      paintCanvas,
+      0,
+      0,
+      paintCanvas.width,
+      paintCanvas.height,
+      0,
+      0,
+      snapshot.width,
+      snapshot.height
+    );
+  }
+
+  return snapshot;
+}
+
+function prepareMoveSelection() {
+  if (
+    !lassoClosed ||
+    lassoPoints.length < 3
+  ) {
+    setStatus("Close LASSO first");
+    return;
+  }
+
+  const bounds =
+    getLassoBounds(lassoPoints);
+
+  const snapshot =
+    buildCurrentEditorSnapshot();
+
+  selectionCanvas.width =
+    bounds.width;
+
+  selectionCanvas.height =
+    bounds.height;
+
+  selectionCtx.clearRect(
+    0,
+    0,
+    selectionCanvas.width,
+    selectionCanvas.height
+  );
+
+  selectionCtx.save();
+
+  selectionCtx.translate(
+    -bounds.x,
+    -bounds.y
+  );
+
+  traceLassoPath(
+    selectionCtx,
+    lassoPoints,
+    true
+  );
+
+  selectionCtx.clip();
+
+  selectionCtx.drawImage(
+    snapshot,
+    0,
+    0
+  );
+
+  selectionCtx.restore();
+
+  selectionBaseCanvas.width =
+    snapshot.width;
+
+  selectionBaseCanvas.height =
+    snapshot.height;
+
+  selectionBaseCtx.clearRect(
+    0,
+    0,
+    selectionBaseCanvas.width,
+    selectionBaseCanvas.height
+  );
+
+  selectionBaseCtx.drawImage(
+    snapshot,
+    0,
+    0
+  );
+
+  if (moveSelectionState.mode === "cut") {
+    selectionBaseCtx.save();
+
+    selectionBaseCtx.globalCompositeOperation =
+      "destination-out";
+
+    traceLassoPath(
+      selectionBaseCtx,
+      lassoPoints,
+      true
+    );
+
+    selectionBaseCtx.fill();
+
+    selectionBaseCtx.restore();
+  }
+
+  moveSelectionState.ready = true;
+  moveSelectionState.deleted = false;
+  moveSelectionState.centerX =
+    bounds.x + bounds.width / 2;
+  moveSelectionState.centerY =
+    bounds.y + bounds.height / 2;
+  moveSelectionState.width =
+    bounds.width;
+  moveSelectionState.height =
+    bounds.height;
+  moveSelectionState.scale = 1;
+  moveSelectionState.rotation = 0;
+  moveSelectionState.flipX = 1;
+  moveSelectionState.flipY = 1;
+
+  moveScale.value = "100";
+  moveScaleValue.textContent = "100%";
+  moveRotation.value = "0";
+  moveRotationValue.textContent = "0°";
+
+  clearLassoSelection();
+  drawEditor();
+
+  setStatus(
+    moveSelectionState.mode === "cut"
+      ? "Selection cut and ready"
+      : "Selection copied and ready"
+  );
+}
+
+function drawMoveSelectionLayer(
+  targetCtx,
+  targetWidth,
+  targetHeight
+) {
+  if (!moveSelectionState.ready)
+    return;
+
+  targetCtx.save();
+
+  targetCtx.drawImage(
+    selectionBaseCanvas,
+    0,
+    0,
+    selectionBaseCanvas.width,
+    selectionBaseCanvas.height,
+    0,
+    0,
+    targetWidth,
+    targetHeight
+  );
+
+  if (!moveSelectionState.deleted) {
+    const sx =
+      targetWidth / editCanvas.width;
+
+    const sy =
+      targetHeight / editCanvas.height;
+
+    const centerX =
+      moveSelectionState.centerX * sx;
+
+    const centerY =
+      moveSelectionState.centerY * sy;
+
+    const width =
+      moveSelectionState.width *
+      moveSelectionState.scale *
+      sx;
+
+    const height =
+      moveSelectionState.height *
+      moveSelectionState.scale *
+      sy;
+
+    targetCtx.translate(
+      centerX,
+      centerY
+    );
+
+    targetCtx.rotate(
+      moveSelectionState.rotation *
+      Math.PI / 180
+    );
+
+    targetCtx.scale(
+      moveSelectionState.flipX,
+      moveSelectionState.flipY
+    );
+
+    targetCtx.drawImage(
+      selectionCanvas,
+      -width / 2,
+      -height / 2,
+      width,
+      height
+    );
+  }
+
+  targetCtx.restore();
+}
+
+editCanvas.addEventListener("mousedown", (event) => {
+  if (
+    activeMode !== "move" ||
+    !moveSelectionState.ready ||
+    moveSelectionState.deleted
+  ) {
+    return;
+  }
+
+  const pos =
+    getMousePosOnCanvas(event);
+
+  isMovingSelection = true;
+  moveSelectionStartX = pos.x;
+  moveSelectionStartY = pos.y;
+  moveSelectionOriginX = moveSelectionState.centerX;
+  moveSelectionOriginY = moveSelectionState.centerY;
+
+  editCanvas.style.cursor = "grabbing";
+  event.preventDefault();
+});
+
+editCanvas.addEventListener("mousemove", (event) => {
+  if (
+    activeMode !== "move" ||
+    !isMovingSelection
+  ) {
+    return;
+  }
+
+  const pos =
+    getMousePosOnCanvas(event);
+
+  let dx =
+    pos.x - moveSelectionStartX;
+
+  let dy =
+    pos.y - moveSelectionStartY;
+
+  if (event.shiftKey) {
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      dy = 0;
+    } else {
+      dx = 0;
+    }
+  }
+
+  moveSelectionState.centerX =
+    moveSelectionOriginX + dx;
+
+  moveSelectionState.centerY =
+    moveSelectionOriginY + dy;
+
+  drawEditor();
+  event.preventDefault();
+});
+
+window.addEventListener("mouseup", () => {
+  if (!isMovingSelection)
+    return;
+
+  isMovingSelection = false;
+
+  if (activeMode === "move") {
+    editCanvas.style.cursor = "grab";
+  }
+
+  setStatus("Selection moved");
+});
+
+document.addEventListener("keydown", (event) => {
+  if (
+    activeMode !== "move" ||
+    !moveSelectionState.ready
+  ) {
+    return;
+  }
+
+  if (event.key === "Delete") {
+    event.preventDefault();
+    moveSelectionState.deleted = true;
+    drawEditor();
+    return;
+  }
+
+  const step =
+    event.shiftKey ? 10 : 1;
+
+  if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    moveSelectionState.centerX -= step;
+  } else if (event.key === "ArrowRight") {
+    event.preventDefault();
+    moveSelectionState.centerX += step;
+  } else if (event.key === "ArrowUp") {
+    event.preventDefault();
+    moveSelectionState.centerY -= step;
+  } else if (event.key === "ArrowDown") {
+    event.preventDefault();
+    moveSelectionState.centerY += step;
+  } else {
+    return;
+  }
+
+  drawEditor();
+});
+
+function resetMoveSelectionState() {
+  moveSelectionState.ready = false;
+  moveSelectionState.deleted = false;
+  moveSelectionState.centerX = 0;
+  moveSelectionState.centerY = 0;
+  moveSelectionState.width = 0;
+  moveSelectionState.height = 0;
+  moveSelectionState.scale = 1;
+  moveSelectionState.rotation = 0;
+  moveSelectionState.flipX = 1;
+  moveSelectionState.flipY = 1;
+
+  isMovingSelection = false;
+
+  selectionCanvas.width = 0;
+  selectionCanvas.height = 0;
+  selectionBaseCanvas.width = 0;
+  selectionBaseCanvas.height = 0;
+}
+
 /*
 ================================
 УПРАВЛЕНИЕ ERASER
@@ -4938,6 +5524,8 @@ function resetAllEditingState() {
   pinchStartDistance = null;
   pinchStartZoom = 1;
   suppressResizeClick = false;
+
+  resetMoveSelectionState();
 }
 
 /*
@@ -5022,6 +5610,18 @@ function drawEditor() {
   if (activeMode === "brush") {
     drawBrushCursor();
   }
+
+  if (
+    activeMode === "move" &&
+    moveSelectionState.ready
+  ) {
+    drawMoveSelectionLayer(
+      editCtx,
+      editCanvas.width,
+      editCanvas.height
+    );
+  }
+
 }
 
 function drawNormalEditor() {
@@ -5414,6 +6014,22 @@ outCtx.drawImage(paintCanvas, 0, 0, paintCanvas.width, paintCanvas.height, 0, 0,
    
   if (keyState && keyState.enabled) {
     applyColorKey(outCtx, finalWidth, finalHeight, keyState);
+  }
+
+
+  if (moveSelectionState.ready) {
+    outCtx.clearRect(
+      0,
+      0,
+      outCanvas.width,
+      outCanvas.height
+    );
+
+    drawMoveSelectionLayer(
+      outCtx,
+      outCanvas.width,
+      outCanvas.height
+    );
   }
 
   const blob = await canvasToBlob(outCanvas, "image/webp", quality);
@@ -6388,7 +7004,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-fix  panel-header | v5.10.6
+Add Move | v5.11.0
   </div>
 
   <div class="row" id="build-down">
