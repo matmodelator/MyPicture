@@ -698,13 +698,7 @@ The image is fitted into the page with selected margins and orientation.
       <button id="lassoModeBtn" type="button">LASSO</button>
       <div class="tool-tip">Polygon, Freehand or Magnetic Lasso selection.</div>
     </div>
-
-    <div class="tool-wrap" data-tip-wrap>
-      <button id="moveModeBtn" type="button">Move</button>
-      <div class="tool-tip">Copy or cut a closed LASSO selection, then move, rotate, scale, flip, flop or delete it.</div>
-    </div>
-
-    <div class="tool-wrap" data-tip-wrap>
+<div class="tool-wrap" data-tip-wrap>
       <button id="eraserModeBtn" type="button">Eraser</button>
       <div class="tool-tip">Erase pixels with a round or square brush.</div>
     </div>
@@ -817,39 +811,26 @@ The image is fitted into the page with selected margins and orientation.
           </div>
         </div>
 
-<div class="field">
-      <label>Keyboard</label>
+        <div class="field">
+          <label>Keyboard</label>
 
-      <div class="hint">
-        <b>Backspace</b> — Undo last point<br>
-        <b>|</b> — Redo last point<br>
-        <b>Enter</b> — Close contour<br>
-        <b>Esc</b> — Clear contour<br>
-        <b>Delete</b> — Delete point<br>
-        <b>Space</b> — Move image (Zoom)
+          <div class="hint">
+            <b>Backspace</b> — Undo last point<br>
+            <b>|</b> — Redo last point<br>
+            <b>Enter</b> — Close contour<br>
+            <b>Esc</b> — Clear contour<br>
+            <b>Delete</b> — Delete point<br>
+            <b>Space</b> — Move image (Zoom)
+          </div>
+        </div>
+
       </div>
-    </div>
 
-         
-      </div>
-
-      <div class="note">
-Polygon: click points; double-click, Enter or Close finishes the contour.
-Freehand: hold and draw the contour.
-Magnetic: hold and draw; points snap to nearby image edges.
-Outside the closed contour becomes transparent after Apply.
-      </div>
-    </div>
-
-     
-
-    <!-- Панель MOVE SELECTION -->
-    <div id="movePanel" class="mode-panel">
       <div class="move-grid">
 
         <div class="field">
           <label for="moveSelectionMode">Mode</label>
-          <select id="moveSelectionMode">
+          <select id="moveSelectionMode" disabled>
             <option value="copy">Copy</option>
             <option value="cut">Cut</option>
           </select>
@@ -857,33 +838,36 @@ Outside the closed contour becomes transparent after Apply.
 
         <div class="field">
           <label>Selection</label>
-          <button id="prepareSelectionBtn" type="button">Take from LASSO</button>
+          <button id="prepareSelectionBtn" type="button" disabled>Take selection</button>
         </div>
 
         <div class="field">
           <label for="moveScale">Scale: <span id="moveScaleValue">100%</span></label>
-          <input id="moveScale" type="range" min="10" max="300" step="1" value="100">
+          <input id="moveScale" type="range" min="10" max="300" step="1" value="100" disabled>
         </div>
 
         <div class="field">
           <label for="moveRotation">Rotate: <span id="moveRotationValue">0°</span></label>
-          <input id="moveRotation" type="range" min="-180" max="180" step="1" value="0">
+          <input id="moveRotation" type="range" min="-180" max="180" step="1" value="0" disabled>
         </div>
 
         <div class="field">
           <label>Transform</label>
           <div>
-            <button id="flipSelectionBtn" type="button">Flip</button>
-            <button id="flopSelectionBtn" type="button">Flop</button>
-            <button id="deleteSelectionBtn" type="button">Delete</button>
+            <button id="flipSelectionBtn" type="button" disabled>Flip</button>
+            <button id="flopSelectionBtn" type="button" disabled>Flop</button>
+            <button id="deleteSelectionBtn" type="button" disabled>Delete</button>
           </div>
         </div>
 
       </div>
 
       <div class="note">
-Close LASSO first, choose Copy or Cut, press Take from LASSO, then drag the selection.
-Flip mirrors horizontally. Flop mirrors vertically. Apply commits the transformed selection to Result.
+Polygon: click points; double-click, Enter or Close finishes the contour.
+Freehand: hold and draw the contour.
+Magnetic: hold and draw; points snap to nearby image edges.
+After closing the contour, Copy / Cut and Take selection become active.
+After Take selection, Move, Rotate, Scale, Flip, Flop and Delete become active.
       </div>
     </div>
 
@@ -1238,7 +1222,7 @@ let sourceImage = null;
 let imageNaturalWidth = 0;
 let imageNaturalHeight = 0;
 
-/* Активный режим: null | crop | lasso | move | eraser | fill | brush | zoom | resize | color | key */
+/* Активный режим: null | crop | lasso | eraser | fill | brush | zoom | resize | color | key */
 let activeMode = null;
 
 /*
@@ -1492,7 +1476,6 @@ const pdfMargin = document.getElementById("pdfMargin");
 
 const cropModeBtn = document.getElementById("cropModeBtn");
 const lassoModeBtn = document.getElementById("lassoModeBtn");
-const moveModeBtn = document.getElementById("moveModeBtn");
 const zoomModeBtn = document.getElementById("zoomModeBtn");
 const resizeModeBtn = document.getElementById("resizeModeBtn");
 const colorModeBtn = document.getElementById("colorModeBtn");
@@ -1519,7 +1502,6 @@ const zipBtn =
    
 const cropPanel = document.getElementById("cropPanel");
 const lassoPanel = document.getElementById("lassoPanel");
-const movePanel = document.getElementById("movePanel");
 const resizePanel = document.getElementById("resizePanel");
 const colorPanel = document.getElementById("colorPanel");
 const keyPanel = document.getElementById("keyPanel");
@@ -2091,7 +2073,6 @@ function finishFileInput() {
 
 cropModeBtn.addEventListener("click", () => toggleMode("crop"));
 lassoModeBtn.addEventListener("click", () => toggleMode("lasso"));
-moveModeBtn.addEventListener("click", () => toggleMode("move"));
 eraserModeBtn.addEventListener("click", () => toggleMode("eraser"));
 fillModeBtn.addEventListener("click", () => toggleMode("fill"));
 brushModeBtn.addEventListener("click", () => toggleMode("brush"));   
@@ -2120,7 +2101,6 @@ function toggleMode(mode) {
 function updateModeUI() {
   cropModeBtn.classList.toggle("active", activeMode === "crop");
   lassoModeBtn.classList.toggle("active", activeMode === "lasso");
-  moveModeBtn.classList.toggle("active", activeMode === "move");
   zoomModeBtn.classList.toggle("active", activeMode === "zoom");
   resizeModeBtn.classList.toggle("active", activeMode === "resize");
   colorModeBtn.classList.toggle("active", activeMode === "color");
@@ -2134,7 +2114,6 @@ function updateModeUI() {
   brushPanel.classList.toggle("visible", activeMode === "brush");
   cropPanel.classList.toggle("visible", activeMode === "crop");
   lassoPanel.classList.toggle("visible", activeMode === "lasso");
-  movePanel.classList.toggle("visible", activeMode === "move");
   resizePanel.classList.toggle("visible", activeMode === "resize");
   colorPanel.classList.toggle("visible", activeMode === "color");
   keyPanel.classList.toggle("visible", activeMode === "key");
@@ -2156,12 +2135,10 @@ if (activeMode === "crop") {
   editCanvas.style.cursor = "crosshair";
 
 } else if (activeMode === "lasso") {
-  editCanvas.style.cursor = "crosshair";
-
-} else if (activeMode === "move") {
-  editCanvas.style.cursor = moveSelectionState.ready
-    ? (isMovingSelection ? "grabbing" : "grab")
-    : "default";
+  editCanvas.style.cursor =
+    moveSelectionState.ready
+      ? (isMovingSelection ? "grabbing" : "grab")
+      : "crosshair";
 
 } else if (activeMode === "eraser" || activeMode === "brush") {
   editCanvas.style.cursor = "none";
@@ -2198,15 +2175,12 @@ function updateEditorHint() {
 
   if (activeMode === "lasso") {
     editorHint.textContent =
-      "LASSO: Backspace — Undo point | \\ — Redo point | Enter — Close | Esc — Clear | Delete — Delete point";
+      moveSelectionState.ready
+        ? "LASSO TRANSFORM: drag to move | arrows — 1 px | Shift + arrows — 10 px | Delete — remove selection"
+        : "LASSO: Backspace — Undo point | \\ — Redo point | Enter — Close | Esc — Clear | Delete — Delete point";
     return;
   }
 
-  if (activeMode === "move") {
-    editorHint.textContent =
-      "MOVE: Close LASSO, choose Copy or Cut, press Take from LASSO, then drag. Flip = horizontal, Flop = vertical.";
-    return;
-  }
 
   if (activeMode === "eraser") {
     editorHint.textContent =
@@ -2248,6 +2222,46 @@ function updateEditorHint() {
     "Select an editing tool.";
 }
    
+
+/*
+================================
+АКТИВНОСТЬ УПРАВЛЕНИЯ LASSO
+================================
+*/
+
+function updateLassoTransformControls() {
+  const contourReady =
+    lassoClosed &&
+    lassoPoints.length >= 3;
+
+  const selectionReady =
+    moveSelectionState.ready;
+
+  moveSelectionMode.disabled =
+    !contourReady ||
+    selectionReady;
+
+  prepareSelectionBtn.disabled =
+    !contourReady ||
+    selectionReady;
+
+  moveScale.disabled =
+    !selectionReady;
+
+  moveRotation.disabled =
+    !selectionReady;
+
+  flipSelectionBtn.disabled =
+    !selectionReady;
+
+  flopSelectionBtn.disabled =
+    !selectionReady;
+
+  deleteSelectionBtn.disabled =
+    !selectionReady;
+}
+
+updateLassoTransformControls();
 
 /*
 ================================
@@ -2516,8 +2530,19 @@ function prepareMoveSelection() {
   moveRotation.value = "0";
   moveRotationValue.textContent = "0°";
 
-  clearLassoSelection();
+  lassoPoints = [];
+  lassoRedoPoints = [];
+
+  lassoClosed = false;
+  isDrawingLasso = false;
+
+  draggedLassoPointIndex = -1;
+  hoveredLassoPointIndex = -1;
+  suppressLassoClick = false;
+
+  updateLassoTransformControls();
   drawEditor();
+  updateModeUI();
 
   setStatus(
     moveSelectionState.mode === "cut"
@@ -2600,7 +2625,7 @@ function drawMoveSelectionLayer(
 
 editCanvas.addEventListener("mousedown", (event) => {
   if (
-    activeMode !== "move" ||
+    activeMode !== "lasso" ||
     !moveSelectionState.ready ||
     moveSelectionState.deleted
   ) {
@@ -2622,7 +2647,7 @@ editCanvas.addEventListener("mousedown", (event) => {
 
 editCanvas.addEventListener("mousemove", (event) => {
   if (
-    activeMode !== "move" ||
+    activeMode !== "lasso" ||
     !isMovingSelection
   ) {
     return;
@@ -2661,7 +2686,7 @@ window.addEventListener("mouseup", () => {
 
   isMovingSelection = false;
 
-  if (activeMode === "move") {
+  if (activeMode === "lasso") {
     editCanvas.style.cursor = "grab";
   }
 
@@ -2670,7 +2695,7 @@ window.addEventListener("mouseup", () => {
 
 document.addEventListener("keydown", (event) => {
   if (
-    activeMode !== "move" ||
+    activeMode !== "lasso" ||
     !moveSelectionState.ready
   ) {
     return;
@@ -2723,6 +2748,8 @@ function resetMoveSelectionState() {
   selectionCanvas.height = 0;
   selectionBaseCanvas.width = 0;
   selectionBaseCanvas.height = 0;
+
+  updateLassoTransformControls();
 }
 
 /*
@@ -3990,10 +4017,14 @@ function clearLassoSelection() {
 
   draggedLassoPointIndex = -1;
   hoveredLassoPointIndex = -1;
+
   suppressLassoClick = false;
   lassoInverted = false;
 
+  resetMoveSelectionState();
+
   updateHistoryButtons();
+  updateLassoTransformControls();
 }
 
 /*
@@ -4014,6 +4045,7 @@ function closeLassoSelection() {
 
   drawEditor();
   updateHistoryButtons();
+  updateLassoTransformControls();
 
   setStatus("Lasso closed OK");
 }
@@ -4042,6 +4074,8 @@ function addLassoPoint(point) {
 
   updateHistoryButtons();
   drawEditor();
+
+  updateLassoTransformControls();
 }
 
 /*
@@ -4071,6 +4105,7 @@ function undoLassoPoint() {
   drawEditor();
 
   setStatus("Lasso point undo OK");
+  updateLassoTransformControls();
 
   return true;
 }
@@ -4102,6 +4137,7 @@ function redoLassoPoint() {
   drawEditor();
 
   setStatus("Lasso point redo OK");
+  updateLassoTransformControls();
 
   return true;
 }
@@ -4292,7 +4328,8 @@ MOUSE LASSO
 editCanvas.addEventListener("mousemove", (event) => {
   if (
     !sourceImage ||
-    activeMode !== "lasso"
+    activeMode !== "lasso" ||
+    moveSelectionState.ready
   ) {
     return;
   }
@@ -4333,7 +4370,8 @@ suppressLassoClick = true;
 editCanvas.addEventListener("mousedown", (event) => {
   if (
     !sourceImage ||
-    activeMode !== "lasso"
+    activeMode !== "lasso" ||
+    moveSelectionState.ready
   ) {
     return;
   }
@@ -4383,7 +4421,8 @@ CLICK LASSO
 editCanvas.addEventListener("click", (event) => {
   if (
     !sourceImage ||
-    activeMode !== "lasso"
+    activeMode !== "lasso" ||
+    moveSelectionState.ready
   ) {
     return;
   }
@@ -4452,7 +4491,8 @@ editCanvas.addEventListener("click", (event) => {
 editCanvas.addEventListener("dblclick", (event) => {
   if (
     !sourceImage ||
-    activeMode !== "lasso"
+    activeMode !== "lasso" ||
+    moveSelectionState.ready
   ) {
     return;
   }
@@ -5612,7 +5652,7 @@ function drawEditor() {
   }
 
   if (
-    activeMode === "move" &&
+    activeMode === "lasso" &&
     moveSelectionState.ready
   ) {
     drawMoveSelectionLayer(
@@ -7004,7 +7044,7 @@ function resetResult() {
 <div id="service-console">
 
   <div class="row" id="build-top">
-Add Move | v5.11.0
+ Move inside Lass0| v5.11.1
   </div>
 
   <div class="row" id="build-down">
