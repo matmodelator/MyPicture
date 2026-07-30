@@ -18,6 +18,12 @@
 ======================================== -->
 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 
+<!-- ========================================
+     PDF-LIB
+     Нужен для объединения PDF-файлов
+======================================== -->
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>     
+
 <style>
 
 /* ========================================
@@ -274,6 +280,32 @@ textarea {
       <input id="fileInput" type="file" accept="image/*,.pdf" />
     </div>
 
+<!-- ========================================
+     ОБЪЕДИНЕНИЕ PDF
+======================================== -->
+<div class="field">
+  <label>&nbsp;</label>
+  <button id="mergePdfBtn" type="button" class="secondary">
+    Merge PDF
+  </button>
+
+  <input
+    id="mergePdfInput"
+    type="file"
+    accept=".pdf,application/pdf"
+    multiple
+    hidden
+  />
+</div>
+
+<div class="field">
+  <label for="mergeOrder">Order</label>
+  <select id="mergeOrder">
+    <option value="selected" selected>Selected order</option>
+    <option value="name">Alphabetical</option>
+  </select>
+</div>
+       
     <!-- ========================================
          ЯЗЫК OCR
     ======================================== -->
@@ -393,6 +425,10 @@ const pdfScale = document.getElementById("pdfScale");
 const runBtn = document.getElementById("runBtn");
 const downloadTxtBtn = document.getElementById("downloadTxtBtn");
 const clearBtn = document.getElementById("clearBtn");
+
+const mergePdfBtn = document.getElementById("mergePdfBtn");
+const mergePdfInput = document.getElementById("mergePdfInput");
+const mergeOrder = document.getElementById("mergeOrder");     
 
 const statusBox = document.getElementById("status");
 const previewStack = document.getElementById("previewStack");
@@ -756,6 +792,183 @@ runBtn.addEventListener("click", async () => {
 
 /*
 ================================
+ОБЪЕДИНЕНИЕ PDF
+================================
+*/
+
+/*
+  Открываем системное окно выбора файлов.
+*/
+mergePdfBtn.addEventListener("click", () => {
+  mergePdfInput.value = "";
+  mergePdfInput.click();
+});
+
+/*
+  После выбора объединяем PDF-файлы.
+*/
+mergePdfInput.addEventListener("change", async () => {
+  let files = Array.from(mergePdfInput.files || []);
+
+  if (files.length < 2) {
+    setStatus("ERROR: выбери минимум два PDF-файла");
+    return;
+  }
+
+  /*
+    Проверяем, что выбраны только PDF.
+  */
+  const invalidFile = files.find(file => {
+    return (
+      file.type !== "application/pdf" &&
+      !/\.pdf$/i.test(file.name)
+    );
+  });
+
+  if (invalidFile) {
+    setStatus("ERROR: поддерживаются только PDF-файлы");
+    return;
+  }
+
+  /*
+    Порядок:
+    selected — порядок в списке выбранных файлов;
+    name — сортировка по имени.
+  */
+  if (mergeOrder.value === "name") {
+    files.sort((a, b) => {
+      return a.name.localeCompare(
+        b.name,
+        undefined,
+        {
+          numeric: true,
+          sensitivity: "base"
+        }
+      );
+    });
+  }
+
+  try {
+    mergePdfBtn.disabled = true;
+    runBtn.disabled = true;
+
+    clearStatus();
+
+    progressBox.textContent =
+      "Preparing PDF merge...\n" +
+      "Files: " + files.length;
+
+    /*
+      Создаём новый пустой PDF.
+     */
+    const mergedPdf = await PDFLib.PDFDocument.create();
+
+    let totalPages = 0;
+
+    /*
+      Последовательно открываем каждый PDF
+      и копируем из него все страницы.
+    */
+    for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
+      const file = files[fileIndex];
+
+      progressBox.textContent =
+        "Merge PDF\n" +
+        "File " + (fileIndex + 1) + " / " + files.length + "\n" +
+        file.name;
+
+      const sourceBytes = await file.arrayBuffer();
+
+      const sourcePdf = await PDFLib.PDFDocument.load(
+        sourceBytes,
+        {
+          ignoreEncryption: false
+        }
+      );
+
+      const pageIndexes = sourcePdf.getPageIndices();
+
+      const copiedPages = await mergedPdf.copyPages(
+        sourcePdf,
+        pageIndexes
+      );
+
+      copiedPages.forEach(page => {
+        mergedPdf.addPage(page);
+      });
+
+      totalPages += copiedPages.length;
+    }
+
+    /*
+      Создаём итоговый PDF.
+    */
+    const mergedBytes = await mergedPdf.save();
+
+    const mergedBlob = new Blob(
+      [mergedBytes],
+      {
+        type: "application/pdf"
+      }
+    );
+
+    const downloadUrl = URL.createObjectURL(mergedBlob);
+
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = "merged.pdf";
+
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    setTimeout(() => {
+      URL.revokeObjectURL(downloadUrl);
+    }, 1000);
+
+    fileInfo.textContent =
+      "File name: merged.pdf\n" +
+      "Format: PDF\n" +
+      "File size: " + formatSize(mergedBlob.size) + "\n" +
+      "Files merged: " + files.length + "\n" +
+      "Pages: " + totalPages;
+
+    progressBox.textContent =
+      "Done\n" +
+      "Files merged: " + files.length + "\n" +
+      "Pages: " + totalPages;
+
+    setStatus("Merge PDF OK");
+  } catch (error) {
+    console.error(error);
+
+    const message = String(
+      error?.message || error
+    );
+
+    if (
+      message.toLowerCase().includes("encrypted") ||
+      message.toLowerCase().includes("password")
+    ) {
+      setStatus(
+        "ERROR: один из PDF защищён паролем"
+      );
+    } else {
+      setStatus(
+        "ERROR: не удалось объединить PDF — " +
+        message
+      );
+    }
+
+    progressBox.textContent = "";
+  } finally {
+    mergePdfBtn.disabled = false;
+    runBtn.disabled = false;
+  }
+});
+     
+/*
+================================
 СКАЧАТЬ TXT
 ================================
 */
@@ -824,7 +1037,7 @@ fileInput.addEventListener("change", () => {
 <div id="service-console">
 
   <div class="row" id="build-top">
-start | v1.0.0
+Merge PDF | v1.1.0
   </div>
 
   <div class="row" id="build-down">
